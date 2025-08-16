@@ -139,6 +139,16 @@ The fastest way to get started is using our pre-configured VS Code devcontainer:
 
 For detailed setup instructions, including Windows/macOS host setup, see [Development Environment Guide](docs/dev-environment.md).
 
+### CLI Usage
+
+The AgentFlow CLI (`af`) provides essential development and validation tools:
+
+- **Environment Validation**: `af validate` - Comprehensive environment check
+- **JSON Output**: Structured validation results for automation
+- **Cross-Platform**: Works on Linux, Windows, macOS, and containers
+
+For complete CLI documentation, see [CLI Quickstart Guide](docs/cli-quickstart.md).
+
 ### Quick Start
 
 1. **Build all components**:

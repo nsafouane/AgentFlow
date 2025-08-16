@@ -70,7 +70,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create migration policy (naming, reversibility stance)
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 6. CLI `af validate` Stub
+- [x] 6. CLI `af validate` Stub
+
+
+
+
+
   - **Implementation**: Create CLI that outputs JSON skeleton with environment probes placeholders
   - **Unit Tests**: Implement JSON schema validation test
   - **Manual Testing**: Run on host vs devcontainer and verify warning displayed
