@@ -1,0 +1,46 @@
+{
+  "name": "AgentFlow Development",
+  "image": "mcr.microsoft.com/devcontainers/go:1.22-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools",
+        "task.vscode-task"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "/go",
+        "go.goroot": "/usr/local/go"
+      }
+    }
+  },
+  "postCreateCommand": ".devcontainer/post-create.sh",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "forwardPorts": [5432, 4222, 8222],
+  "portsAttributes": {
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "notify"
+    },
+    "4222": {
+      "label": "NATS",
+      "onAutoForward": "notify"
+    },
+    "8222": {
+      "label": "NATS Monitoring",
+      "onAutoForward": "notify"
+    }
+  }
+}

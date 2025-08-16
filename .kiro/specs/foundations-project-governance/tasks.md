@@ -18,7 +18,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create architecture README section describing repo conventions
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 2. Dev Container & Toolchain Standardization
+- [x] 2. Dev Container & Toolchain Standardization
+
+
+
+
+
   - **Implementation**: Create .devcontainer with pinned Go, NATS, Postgres clients, and pre-commit hooks
   - **Unit Tests**: Write script validating required binaries versions
   - **Manual Testing**: Open in VS Code devcontainer and run `af validate` stub

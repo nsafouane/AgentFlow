@@ -115,41 +115,47 @@ agentflow/
 
 ## Getting Started
 
-### Prerequisites
-- Go 1.22+
-- Docker (for development environment)
-- make or Task runner
+### Development Environment Setup
 
-### Quick Start
+The fastest way to get started is using our pre-configured VS Code devcontainer:
 
-1. **Clone the repository**:
+1. **Prerequisites**:
+   - [VS Code](https://code.visualstudio.com/)
+   - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+   - [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+2. **Quick Setup**:
    ```bash
    git clone https://github.com/agentflow/agentflow.git
    cd agentflow
+   code .
+   # Click "Reopen in Container" when prompted
    ```
 
-2. **Install dependencies**:
+3. **Verify Environment**:
    ```bash
-   make deps
-   # or
-   task deps
+   af validate
    ```
 
-3. **Build all components**:
+For detailed setup instructions, including Windows/macOS host setup, see [Development Environment Guide](docs/dev-environment.md).
+
+### Quick Start
+
+1. **Build all components**:
    ```bash
    make build
    # or
    task build
    ```
 
-4. **Run tests**:
+2. **Run tests**:
    ```bash
    make test
    # or
    task test
    ```
 
-5. **Start development environment**:
+3. **Start development services**:
    ```bash
    make dev
    # or
