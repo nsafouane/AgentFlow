@@ -1,0 +1,137 @@
+# AgentFlow Taskfile
+# Cross-platform task runner for AgentFlow
+version: '3'
+
+vars:
+  BIN_DIR: bin
+  GOOS: '{{OS}}'
+  GOARCH: '{{ARCH}}'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build all AgentFlow components
+    cmds:
+      - echo "Building AgentFlow components..."
+      - go build -o {{.BIN_DIR}}/control-plane{{exeExt}} ./cmd/control-plane
+      - go build -o {{.BIN_DIR}}/worker{{exeExt}} ./cmd/worker
+      - go build -o {{.BIN_DIR}}/af{{exeExt}} ./cmd/af
+      - echo "Build complete"
+
+  test:
+    desc: Run all tests
+    cmds:
+      - echo "Running tests..."
+      - go test ./...
+      - task: test-modules
+
+  test-modules:
+    desc: Run tests for all modules
+    cmds:
+      - cd cmd/control-plane && go test ./...
+      - cd cmd/worker && go test ./...
+      - cd cmd/af && go test ./...
+      - cd sdk/go && go test ./...
+
+  lint:
+    desc: Run golangci-lint on all modules
+    cmds:
+      - echo "Running linting..."
+      - golangci-lint run ./...
+      - task: lint-modules
+
+  lint-modules:
+    desc: Run linting for all modules
+    cmds:
+      - cd cmd/control-plane && golangci-lint run ./...
+      - cd cmd/worker && golangci-lint run ./...
+      - cd cmd/af && golangci-lint run ./...
+      - cd sdk/go && golangci-lint run ./...
+
+  deps:
+    desc: Install/update dependencies
+    cmds:
+      - echo "Installing dependencies..."
+      - go mod tidy
+      - task: deps-modules
+      - echo "Dependencies updated"
+
+  deps-modules:
+    desc: Update dependencies for all modules
+    cmds:
+      - cd cmd/control-plane && go mod tidy
+      - cd cmd/worker && go mod tidy
+      - cd cmd/af && go mod tidy
+      - cd sdk/go && go mod tidy
+
+  dev:
+    desc: Start development environment
+    cmds:
+      - echo "Starting development environment..."
+      - echo "Development environment setup complete"
+
+  security-scan:
+    desc: Run security scans
+    cmds:
+      - echo "Running security scans..."
+      - echo "Security scanning will be implemented with gosec, osv-scanner, etc."
+
+  containers:
+    desc: Build container images
+    cmds:
+      - echo "Building containers..."
+      - echo "Container builds will be implemented with multi-arch support"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - echo "Cleaning build artifacts..."
+      - rm -rf {{.BIN_DIR}}/
+      - go clean ./...
+      - task: clean-modules
+      - echo "Clean complete"
+
+  clean-modules:
+    desc: Clean all modules
+    cmds:
+      - cd cmd/control-plane && go clean ./...
+      - cd cmd/worker && go clean ./...
+      - cd cmd/af && go clean ./...
+      - cd sdk/go && go clean ./...
+
+  build-linux:
+    desc: Build for Linux
+    env:
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -o {{.BIN_DIR}}/linux/control-plane ./cmd/control-plane
+      - go build -o {{.BIN_DIR}}/linux/worker ./cmd/worker
+      - go build -o {{.BIN_DIR}}/linux/af ./cmd/af
+
+  build-windows:
+    desc: Build for Windows
+    env:
+      GOOS: windows
+      GOARCH: amd64
+    cmds:
+      - go build -o {{.BIN_DIR}}/windows/control-plane.exe ./cmd/control-plane
+      - go build -o {{.BIN_DIR}}/windows/worker.exe ./cmd/worker
+      - go build -o {{.BIN_DIR}}/windows/af.exe ./cmd/af
+
+  build-all:
+    desc: Build for all platforms
+    cmds:
+      - task: build-linux
+      - task: build-windows
+
+  validate:
+    desc: Validate development environment
+    cmds:
+      - echo "Validating development environment..."
+      - go version
+      - echo "Environment validation complete"

@@ -1,0 +1,1188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgentFlow — C4 Model Architecture Diagrams</title>
+  <style>
+    body { 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; 
+      margin: 24px; 
+      line-height: 1.45; 
+      background-color: #f8f9fa;
+    }
+    .container { 
+      max-width: 1400px; 
+      margin: 0 auto; 
+      background: white; 
+      padding: 32px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { 
+      margin-bottom: 8px; 
+      color: #1f2937; 
+      border-bottom: 3px solid #3b82f6; 
+      padding-bottom: 8px;
+    }
+    h2 { 
+      margin-top: 48px; 
+      margin-bottom: 16px; 
+      color: #374151; 
+      border-left: 4px solid #10b981; 
+      padding-left: 16px;
+    }
+    h3 { 
+      margin-top: 32px; 
+      color: #4b5563; 
+    }
+    .note { 
+      color: #6b7280; 
+      font-size: 0.95rem; 
+      margin-bottom: 24px;
+      padding: 12px; 
+      background: #f3f4f6; 
+      border-radius: 6px;
+    }
+    .diagram { 
+      margin: 24px 0; 
+      padding: 16px; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 8px; 
+      background: #ffffff;
+    }
+    .quarter-plan { 
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+      padding: 20px; 
+      border-radius: 12px; 
+      margin: 24px 0; 
+      border: 1px solid #dee2e6;
+    }
+    .quarter-plan h3 { 
+      margin-top: 0; 
+      color: #495057;
+    }
+    .quarter-tag { 
+      display: inline-block; 
+      padding: 4px 12px; 
+      border-radius: 20px; 
+      font-weight: 600; 
+      font-size: 0.85rem; 
+      margin: 4px 8px 4px 0;
+    }
+    .q1 { background: #d4edda; color: #155724; }
+    .q2 { background: #fff3cd; color: #856404; }
+    .q3 { background: #f8d7da; color: #721c24; }
+    code { 
+      background: #f1f3f4; 
+      padding: 2px 6px; 
+      border-radius: 4px; 
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    }
+    .architecture-summary { 
+      background: #e7f3ff; 
+      border: 1px solid #b3d9ff; 
+      padding: 16px; 
+      border-radius: 8px; 
+      margin: 24px 0;
+    }
+    .toc { 
+      background: #f8f9fa; 
+      padding: 16px; 
+      border-radius: 8px; 
+      margin: 24px 0; 
+      border: 1px solid #dee2e6;
+    }
+    .toc ul { 
+      margin: 8px 0; 
+      padding-left: 20px;
+    }
+    .toc li { 
+      margin: 4px 0;
+    }
+    .toc a { 
+      text-decoration: none; 
+      color: #3b82f6;
+    }
+    .toc a:hover { 
+      text-decoration: underline;
+    }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ 
+      startOnLoad: true, 
+      theme: 'default', 
+      securityLevel: 'loose',
+      flowchart: {
+        curve: 'basis'
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>AgentFlow — C4 Model Architecture</h1>
+    <p class="note">
+      Complete C4 Model documentation for AgentFlow: A production-ready multi-agent framework with deterministic planning, 
+      enterprise security, and cost-aware execution. This document provides comprehensive architectural views from system 
+      context down to code-level interfaces.
+    </p>
+
+    <div class="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#implementation-roadmap">Implementation Roadmap</a></li>
+        <li><a href="#level1-context">Level 1 — System Context</a></li>
+        <li><a href="#level2-containers">Level 2 — Container Architecture</a></li>
+        <li><a href="#level3-components">Level 3 — Component Details</a></li>
+        <li><a href="#level4-code">Level 4 — Code & Interfaces</a></li>
+        <li><a href="#deployment-views">Deployment Views</a></li>
+        <li><a href="#data-flow">Data Flow Diagrams</a></li>
+        <li><a href="#security-model">Security Architecture</a></li>
+      </ul>
+    </div>
+    
+    <div class="quarter-plan" id="implementation-roadmap">
+      <h3>3-Quarter Implementation Roadmap</h3>
+      <div>
+        <span class="quarter-tag q1">Q1 MVP Foundation (Months 1-3)</span>
+        Core agent runtime, FSM/BT planners, NATS messaging, basic tool execution, PostgreSQL state, cost tracking baseline
+      </div>
+      <div>
+        <span class="quarter-tag q2">Q2 Enterprise Readiness (Months 4-6)</span>
+        gVisor security, MCP protocol, WASM runtime, advanced observability, template marketplace, multi-tenancy
+      </div>
+      <div>
+        <span class="quarter-tag q3">Q3 Scale & Advanced (Months 7-9)</span>
+        Distributed transactions, workflow composition, performance scaling, GA readiness, advanced agent dev tools
+      </div>
+    </div>
+
+    <div class="architecture-summary">
+      <h3>Architecture Principles</h3>
+      <ul>
+        <li><strong>Control/Data Plane Separation:</strong> Clear separation between orchestration and execution</li>
+        <li><strong>Deterministic Behavior:</strong> Reproducible workflows with hash-chained audit trails</li>
+        <li><strong>Security by Default:</strong> Zero-trust tool execution with explicit permissions</li>
+        <li><strong>Cost Awareness:</strong> Token/resource tracking with budget enforcement</li>
+        <li><strong>Observable & Debuggable:</strong> Full tracing, metrics, and replay capabilities</li>
+      </ul>
+    </div>
+
+    <h2 id="level1-context">Level 1 — System Context</h2>
+    <p class="note">Shows AgentFlow in its environment, highlighting external systems and user interactions</p>
+    <div class="diagram mermaid">
+flowchart TB
+  %% External Actors
+  subgraph Users[" "]
+    Dev["👨‍💻 Developer<br/>Builds agents & workflows"]:::person
+    Ops["👩‍💻 Operations<br/>Monitors & deploys"]:::person
+    EndUser["👤 End User<br/>Consumes agent services"]:::person
+    Admin["🔐 Admin<br/>Manages tenants & policies"]:::person
+  end
+
+  %% Core System
+  AF[["🤖 AgentFlow<br/>Multi-Agent Framework<br/><br/>• Deterministic Planning<br/>• Secure Tool Execution<br/>• Cost Management<br/>• Enterprise Security"]]:::system
+
+  %% External Systems
+  subgraph Infrastructure[" "]
+    NATS[("📨 NATS JetStream<br/>Message Bus & Replay")]:::external
+    PG[("🗄️ PostgreSQL<br/>State & Audit Logs")]:::external
+    Redis[("⚡ Redis<br/>Cache & Rate Limiting")]:::external
+    Vector[("🧠 Vector DB<br/>Pinecone/Qdrant/Weaviate<br/>Agent Memory")]:::external
+  end
+
+  subgraph Security[" "]
+    Vault[("🔐 Secrets Manager<br/>Vault/AWS SM/Azure KV")]:::external
+    OIDC[("🆔 Identity Provider<br/>OIDC/SAML")]:::external
+  end
+
+  subgraph AI_Providers[" "]
+    LLM[("🧠 LLM Providers<br/>OpenAI/Anthropic/etc.")]:::external
+    OnPrem[("🏠 On-Prem Models<br/>vLLM/Ollama/TGI")]:::external
+  end
+
+  subgraph Observability[" "]
+    Telemetry[("📊 Observability<br/>Prometheus/Jaeger/OTEL")]:::external
+    Grafana[("📈 Grafana<br/>Dashboards & Alerting")]:::external
+  end
+
+  subgraph Ecosystem[" "]
+    Hub[("🏪 Template Marketplace<br/>AgentFlow Hub")]:::external
+    Cloud[("☁️ Cloud Providers<br/>AWS/GCP/Azure")]:::external
+    MCP[("🔌 MCP Servers<br/>External Tool Providers")]:::external
+  end
+
+  %% Relationships - Users
+  Dev -- "CLI • SDK • Templates<br/>Dashboard" --> AF
+  Ops -- "Deploy • Monitor<br/>Cost Reports" --> AF
+  EndUser -- "API Calls<br/>Workflow Triggers" --> AF
+  Admin -- "Tenant Management<br/>Policy Configuration" --> AF
+
+  %% Relationships - Infrastructure
+  AF -- "Pub/Sub<br/>Durable Streams" --> NATS
+  AF -- "State Persistence<br/>Audit Trails" --> PG
+  AF -- "Session Cache<br/>Rate Limits" --> Redis
+  AF -- "Memory Storage<br/>Vector Search" --> Vector
+
+  %% Relationships - Security
+  AF -- "Secret Retrieval<br/>Rotation" --> Vault
+  AF -- "Authentication<br/>Authorization" --> OIDC
+
+  %% Relationships - AI
+  AF -- "Model Inference<br/>Embeddings" --> LLM
+  AF -- "Private Models<br/>Zero Egress" --> OnPrem
+
+  %% Relationships - Observability
+  AF -- "Metrics • Traces • Logs" --> Telemetry
+  AF -- "Cost Analytics" --> Grafana
+
+  %% Relationships - Ecosystem
+  AF -- "Template Sync<br/>Marketplace" --> Hub
+  AF -. "Infrastructure Deploy<br/>(af deploy)" .- Cloud
+  AF -- "Tool Integration<br/>Protocol Adapter" --> MCP
+
+  %% Styling
+  classDef person fill:#e1f5fe,stroke:#0277bd,color:#01579b,stroke-width:2px;
+  classDef system fill:#e8f5e8,stroke:#2e7d32,color:#1b5e20,stroke-width:3px;
+  classDef external fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c,stroke-width:2px;
+    </div>
+
+    <h2 id="level2-containers">Level 2 — Container Architecture</h2>
+    <p class="note">Shows the high-level technology choices and how containers communicate</p>
+    <div class="diagram mermaid">
+flowchart TB
+  %% External Dependencies
+  subgraph External[" "]
+    NATS[("📨 NATS JetStream")]:::external
+    PG[("🗄️ PostgreSQL")]:::external
+    Redis[("⚡ Redis")]:::external
+    Vector[("🧠 Vector DB")]:::external
+    Vault[("🔐 Vault")]:::external
+    LLM[("🧠 LLM Providers")]:::external
+    Hub[("🏪 Template Hub")]:::external
+    Telemetry[("📊 Prometheus/Jaeger")]:::external
+  end
+
+  %% AgentFlow System Boundary
+  subgraph AgentFlow["🤖 AgentFlow Framework"]
+    direction TB
+
+    %% Control Plane
+    subgraph CP["🎛️ Control Plane"]
+      direction TB
+      
+      subgraph WebLayer["Web & API Layer"]
+        API["🌐 REST/gRPC API<br/>(Go + Gin/gRPC)<br/><span class='quarter-tag q1'>Q1: Basic REST</span><br/><span class='quarter-tag q2'>Q2: gRPC + WSS</span>"]:::q1
+        WS["🔌 WebSocket Server<br/>(Real-time updates)<br/><span class='quarter-tag q2'>Q2: Live streams</span>"]:::q2
+      end
+
+      Orchestrator["🎼 Orchestrator<br/>(Go + Planning Engine)<br/><span class='quarter-tag q1'>Q1: Core Planning</span><br/><span class='quarter-tag q2'>Q2: Advanced Budget</span><br/><span class='quarter-tag q3'>Q3: Distributed Saga</span>"]:::q1
+      
+      subgraph RegistryLayer["Registry & Templates"]
+        Registry["📋 Registry<br/>(Tools, Templates, Policies)<br/><span class='quarter-tag q1'>Q1: Basic registry</span><br/><span class='quarter-tag q2'>Q2: Versioning</span><br/><span class='quarter-tag q3'>Q3: Marketplace</span>"]:::q1
+        TemplateEngine["📄 Template Engine<br/>(YAML/Go templates)<br/><span class='quarter-tag q2'>Q2: Validation</span>"]:::q2
+      end
+      
+      subgraph GatewayLayer["Model & Security Gateways"]
+        ModelGW["🧠 Model Gateway<br/>(Provider routing + budgets)<br/><span class='quarter-tag q1'>Q1: Basic routing</span><br/><span class='quarter-tag q2'>Q2: Budget enforcement</span>"]:::q1
+        SecretsIF["🔐 Secrets Interface<br/>(Multi-provider)<br/><span class='quarter-tag q2'>Q2: Enterprise secrets</span>"]:::q2
+      end
+
+      Dashboard["📊 Dashboard<br/>(React + tRPC)<br/><span class='quarter-tag q3'>Q3: Full UI</span>"]:::q3
+      MarketplaceConn["🏪 Marketplace Connector<br/>(Template sync)<br/><span class='quarter-tag q3'>Q3: Hub integration</span>"]:::q3
+    end
+
+    %% Data Plane
+    subgraph DP["⚙️ Data Plane"]
+      direction TB
+      
+      Worker["🤖 Agent Runtime<br/>(Go + Message handling)<br/><span class='quarter-tag q1'>Q1: Core runtime</span><br/><span class='quarter-tag q2'>Q2: Advanced memory</span><br/><span class='quarter-tag q3'>Q3: Hot reload</span>"]:::q1
+      
+      subgraph ExecutionLayer["Tool Execution Layer"]
+        Sandbox["🛡️ Tool Executor<br/>(gVisor/Docker/Process)<br/><span class='quarter-tag q1'>Q1: Process isolation</span><br/><span class='quarter-tag q2'>Q2: gVisor security</span>"]:::q1
+        WASMRuntime["🕸️ WASM Runtime<br/>(wasmtime-go)<br/><span class='quarter-tag q2'>Q2: Multi-language</span>"]:::q2
+      end
+      
+      subgraph AdapterLayer["Protocol Adapters"]
+        BusAdapter["📨 Bus Adapter<br/>(NATS client)<br/><span class='quarter-tag q1'>Q1: Basic NATS</span><br/><span class='quarter-tag q2'>Q2: Durable consumers</span>"]:::q1
+        MCPAdapter["🔌 MCP Adapter<br/>(Protocol bridge)<br/><span class='quarter-tag q1'>Q1: Basic handshake</span><br/><span class='quarter-tag q2'>Q2: Full resilience</span>"]:::q1
+      end
+      
+      MemoryMgr["🧠 Memory Manager<br/>(Vector + SQL)<br/><span class='quarter-tag q2'>Q2: Smart retrieval</span><br/><span class='quarter-tag q3'>Q3: Advanced summarization</span>"]:::q2
+    end
+  end
+
+  %% Internal Communication
+  API --> Orchestrator
+  API --> Registry
+  API --> ModelGW
+  WS --> Orchestrator
+  Dashboard --> API
+  Dashboard --> WS
+  
+  Orchestrator --> BusAdapter
+  Orchestrator --> Registry
+  Orchestrator --> ModelGW
+  
+  TemplateEngine --> Registry
+  MarketplaceConn --> Registry
+  
+  Worker --> BusAdapter
+  Worker --> Sandbox
+  Worker --> WASMRuntime
+  Worker --> MCPAdapter
+  Worker --> MemoryMgr
+  Worker --> ModelGW
+  Worker --> SecretsIF
+  
+  MCPAdapter --> Sandbox
+
+  %% External Connections
+  BusAdapter <--> NATS
+  API --> PG
+  Registry --> PG
+  API --> Redis
+  MemoryMgr --> Vector
+  MemoryMgr --> PG
+  SecretsIF --> Vault
+  ModelGW --> LLM
+  MarketplaceConn --> Hub
+  
+  %% Observability
+  API --> Telemetry
+  Orchestrator --> Telemetry
+  Worker --> Telemetry
+  Sandbox --> Telemetry
+
+  %% Styling
+  classDef q1 fill:#e8f5e8,stroke:#388e3c,color:#1b5e20,stroke-width:2px;
+  classDef q2 fill:#fff8e1,stroke:#f57c00,color:#e65100,stroke-width:2px;
+  classDef q3 fill:#fce4ec,stroke:#c2185b,color:#880e4f,stroke-width:2px;
+  classDef external fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c,stroke-width:2px;
+    </div>
+
+    <h2 id="level3-components">Level 3 — Component Details</h2>
+    <p class="note">Detailed breakdown of key components within containers, showing internal structure and responsibilities</p>
+    
+    <h3>Control Plane Components</h3>
+    <div class="diagram mermaid">
+flowchart TB
+  %% Control Plane Component Breakdown
+  subgraph CP["🎛️ Control Plane Detailed Components"]
+    direction TB
+
+    %% Web API Layer
+    subgraph WebAPI["🌐 Web/API Server"]
+      direction TB
+      Auth["🔐 AuthN/AuthZ<br/>(JWT + RBAC)"]:::security
+      Rate["⚡ Rate Limiter<br/>(Redis-based quotas)"]:::infrastructure
+      Middleware["🔧 Middleware Stack<br/>(Logging, Tracing, Recovery)"]:::infrastructure
+      
+      subgraph APIEndpoints["REST/gRPC Endpoints"]
+        WFAPI["📋 Workflows API<br/>(/api/v1/workflows)"]:::api
+        AGAPI["🤖 Agents API<br/>(/api/v1/agents)"]:::api
+        TLAPI["🔧 Tools API<br/>(/api/v1/tools)"]:::api
+        MEMAPI["🧠 Memory API<br/>(/api/v1/memory)"]:::api
+        COSTAPI["💰 Cost API<br/>(/api/v1/costs)"]:::api
+        AUDITAPI["📊 Audit API<br/>(/api/v1/audits)"]:::api
+      end
+    end
+
+    %% Orchestrator Components
+    subgraph Orchestrator["🎼 Orchestrator Engine"]
+      direction TB
+      
+      subgraph PlanningCore["Planning Engine"]
+        FSMPlanner["📈 FSM Planner<br/>(Deterministic states)"]:::planner
+        BTPlanner["🌳 Behavior Tree Planner<br/>(Conditional logic)"]:::planner
+        LLMPlanner["🧠 LLM Planner<br/>(Dynamic planning)"]:::planner
+        PlanValidator["✅ Plan Validator<br/>(Schema + constraints)"]:::planner
+      end
+      
+      PlanCache["📦 Plan Cache<br/>(TTL-based storage)"]:::cache
+      Router["📨 Message Router<br/>(NATS subjects)"]:::messaging
+      
+      subgraph BudgetingCore["Budget & Cost Management"]
+        BudgetEnforcer["💰 Budget Enforcer<br/>(Hard/soft limits)"]:::budget
+        CostEstimator["📊 Cost Estimator<br/>(Token/resource prediction)"]:::budget
+        PricingEngine["💲 Pricing Engine<br/>(Dynamic pricing models)"]:::budget
+      end
+      
+      subgraph PolicyCore["Policy Engine"]
+        PolicyEvaluator["📜 Policy Evaluator<br/>(Rules execution)"]:::policy
+        RetryManager["🔄 Retry Manager<br/>(Exponential backoff)"]:::policy
+        CircuitBreaker["⚡ Circuit Breaker<br/>(Failure handling)"]:::policy
+      end
+      
+      HumanTaskMgr["👤 Human Task Manager<br/>(Assignment + escalation)"]:::human
+    end
+
+    %% Registry Components
+    subgraph Registry["📋 Registry & Templates"]
+      direction TB
+      
+      ToolRegistry["🔧 Tool Registry<br/>(Schema + permissions)"]:::registry
+      TemplateRegistry["📄 Template Registry<br/>(Workflow templates)"]:::registry
+      PlannerRegistry["⚙️ Planner Registry<br/>(Available planners)"]:::registry
+      PolicyStore["📜 Policy Store<br/>(RBAC + execution policies)"]:::registry
+      
+      TemplateEngine["📝 Template Engine<br/>(YAML rendering + validation)"]:::template
+      VersionManager["🏷️ Version Manager<br/>(Semantic versioning)"]:::template
+      
+      HubClient["🏪 Hub Client<br/>(Marketplace sync)"]:::external
+      CacheManager["📦 Cache Manager<br/>(Template caching)"]:::cache
+    end
+
+    %% Security & Gateway Components
+    subgraph SecurityLayer["🔐 Security & Gateway Layer"]
+      direction TB
+      
+      subgraph ModelGateway["🧠 Model Gateway"]
+        ProviderRouter["🔀 Provider Router<br/>(Load balancing)"]:::gateway
+        ResidencyFilter["🏠 Residency Filter<br/>(Data locality)"]:::security
+        TokenCounter["🔢 Token Counter<br/>(Usage tracking)"]:::monitoring
+        ModelCache["📦 Model Cache<br/>(Response caching)"]:::cache
+      end
+      
+      subgraph SecretsManager["🔐 Secrets Manager"]
+        SecretProvider["🔑 Secret Provider<br/>(Multi-backend)"]:::security
+        RotationManager["🔄 Rotation Manager<br/>(Automated rotation)"]:::security
+        EncryptionService["🛡️ Encryption Service<br/>(At-rest encryption)"]:::security
+      end
+      
+      AnomalyDetector["🚨 Anomaly Detector<br/>(Tool usage patterns)"]:::monitoring
+      ComplianceFilter["📋 Compliance Filter<br/>(PII/PHI redaction)"]:::security
+    end
+  end
+
+  %% Component Relationships
+  Auth --> Rate --> Middleware
+  Middleware --> APIEndpoints
+  
+  WFAPI --> PlanningCore
+  AGAPI --> Router
+  TLAPI --> ToolRegistry
+  MEMAPI --> CacheManager
+  COSTAPI --> BudgetingCore
+  AUDITAPI --> AnomalyDetector
+  
+  PlanningCore --> PlanCache
+  PlanningCore --> Router
+  PlanningCore --> BudgetingCore
+  
+  BudgetEnforcer --> PolicyEvaluator
+  Router --> RetryManager
+  RetryManager --> CircuitBreaker
+  
+  PolicyEvaluator --> HumanTaskMgr
+  
+  TemplateEngine --> TemplateRegistry
+  VersionManager --> TemplateRegistry
+  HubClient --> CacheManager
+  
+  ProviderRouter --> TokenCounter
+  ResidencyFilter --> ProviderRouter
+  ModelCache --> TokenCounter
+  
+  SecretProvider --> RotationManager
+  RotationManager --> EncryptionService
+  
+  AnomalyDetector --> ComplianceFilter
+
+  %% Styling
+  classDef security fill:#ffebee,stroke:#d32f2f,color:#b71c1c;
+  classDef infrastructure fill:#e8f5e8,stroke:#388e3c,color:#1b5e20;
+  classDef api fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+  classDef planner fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+  classDef cache fill:#fff3e0,stroke:#f57c00,color:#e65100;
+  classDef messaging fill:#e0f2f1,stroke:#00796b,color:#004d40;
+  classDef budget fill:#f1f8e9,stroke:#689f38,color:#33691e;
+  classDef policy fill:#fce4ec,stroke:#c2185b,color:#880e4f;
+  classDef human fill:#e8eaf6,stroke:#3f51b5,color:#1a237e;
+  classDef registry fill:#fff8e1,stroke:#fbc02d,color:#f57f17;
+  classDef template fill:#f9fbe7,stroke:#827717,color:#827717;
+  classDef external fill:#efebe9,stroke:#5d4037,color:#3e2723;
+  classDef gateway fill:#e0f7fa,stroke:#00acc1,color:#006064;
+  classDef monitoring fill:#fafafa,stroke:#616161,color:#212121;
+    </div>
+
+    <h3>Data Plane Components</h3>
+    <div class="diagram mermaid">
+flowchart TB
+  %% Data Plane Component Breakdown
+  subgraph DP["⚙️ Data Plane Detailed Components"]
+    direction TB
+
+    %% Agent Runtime Core
+    subgraph AgentRuntime["🤖 Agent Runtime Core"]
+      direction TB
+      
+      subgraph RuntimeEngine["Runtime Engine"]
+        LifecycleManager["🔄 Lifecycle Manager<br/>(OnStart/OnMessage/OnFinish)"]:::runtime
+        MessageHandler["📨 Message Handler<br/>(NATS consumer)"]:::messaging
+        StateManager["💾 State Manager<br/>(Checkpoint/restore)"]:::state
+        ErrorHandler["❌ Error Handler<br/>(Graceful degradation)"]:::runtime
+      end
+      
+      subgraph ExecutionCore["Execution Core"]
+        PlanExecutor["⚡ Plan Executor<br/>(Step-by-step execution)"]:::execution
+        ToolInvoker["🔧 Tool Invoker<br/>(Secure tool calls)"]:::execution
+        ResultProcessor["📊 Result Processor<br/>(Output handling)"]:::execution
+        IdempotencyManager["🔒 Idempotency Manager<br/>(Duplicate prevention)"]:::execution
+      end
+      
+      CostTracker["💰 Cost Tracker<br/>(Token usage monitoring)"]:::monitoring
+      HealthMonitor["💗 Health Monitor<br/>(Runtime diagnostics)"]:::monitoring
+    end
+
+    %% Tool Execution Layer
+    subgraph ToolExecution["🛡️ Tool Execution Layer"]
+      direction TB
+      
+      subgraph SandboxCore["Sandbox Core"]
+        ProcessSandbox["📦 Process Sandbox<br/>(Basic isolation)"]:::sandbox
+        DockerSandbox["🐳 Docker Sandbox<br/>(Container isolation)"]:::sandbox
+        GVisorSandbox["🛡️ gVisor Sandbox<br/>(Kernel isolation)"]:::sandbox
+        WASMSandbox["🕸️ WASM Sandbox<br/>(Language-agnostic)"]:::sandbox
+      end
+      
+      subgraph SecurityCore["Security Core"]
+        PermissionEngine["🔐 Permission Engine<br/>(Policy enforcement)"]:::security
+        ResourceLimiter["⚙️ Resource Limiter<br/>(CPU/Memory/Network)"]:::security
+        NetworkPolicy["🌐 Network Policy<br/>(Egress control)"]:::security
+        AuditLogger["📋 Audit Logger<br/>(Tool execution logs)"]:::security
+      end
+      
+      subgraph ExecutionMgmt["Execution Management"]
+        ProcessManager["⚡ Process Manager<br/>(Lifecycle control)"]:::execution
+        TimeoutManager["⏰ Timeout Manager<br/>(Execution limits)"]:::execution
+        OutputCapture["📤 Output Capture<br/>(stdout/stderr handling)"]:::execution
+        CleanupService["🧹 Cleanup Service<br/>(Resource cleanup)"]:::execution
+      end
+    end
+
+    %% Memory Management
+    subgraph MemorySystem["🧠 Memory Management System"]
+      direction TB
+      
+      subgraph MemoryCore["Memory Core"]
+        MemoryAdapter["🔄 Memory Adapter<br/>(Vector + SQL bridge)"]:::memory
+        RetrievalEngine["🔍 Retrieval Engine<br/>(Semantic search)"]:::memory
+        SummarizationEngine["📝 Summarization Engine<br/>(Context compression)"]:::memory
+        EmbeddingService["🧮 Embedding Service<br/>(Vector generation)"]:::memory
+      end
+      
+      subgraph MemoryLayers["Memory Layers"]
+        ShortTermMemory["⚡ Short-term Memory<br/>(Session context)"]:::memory
+        LongTermMemory["💾 Long-term Memory<br/>(Persistent knowledge)"]:::memory
+        EpisodicMemory["📚 Episodic Memory<br/>(Event history)"]:::memory
+      end
+      
+      subgraph MemoryOps["Memory Operations"]
+        CostAwareRetrieval["💰 Cost-aware Retrieval<br/>(Budget-conscious)"]:::budget
+        CacheOptimizer["📦 Cache Optimizer<br/>(Query optimization)"]:::optimization
+        DataMinimizer["🔒 Data Minimizer<br/>(Privacy protection)"]:::security
+        MemoryBudget["💲 Memory Budget<br/>(Usage tracking)"]:::budget
+      end
+    end
+
+    %% Protocol Adapters
+    subgraph ProtocolLayer["🔌 Protocol Adapter Layer"]
+      direction TB
+      
+      subgraph MCPAdapter["🔌 MCP Adapter"]
+        HandshakeManager["🤝 Handshake Manager<br/>(Connection setup)"]:::protocol
+        DescriptorMapper["🗺️ Descriptor Mapper<br/>(Schema translation)"]:::protocol
+        StreamHandler["🌊 Stream Handler<br/>(Bidirectional comms)"]:::protocol
+        CircuitBreakerMCP["⚡ Circuit Breaker<br/>(Resilience)"]:::protocol
+      end
+      
+      subgraph BusAdapter["📨 Bus Adapter"]
+        NATSClient["📡 NATS Client<br/>(JetStream integration)"]:::messaging
+        DurableConsumer["🔄 Durable Consumer<br/>(Message persistence)"]:::messaging
+        BackpressureHandler["⏰ Backpressure Handler<br/>(Flow control)"]:::messaging
+        ReplayManager["🔄 Replay Manager<br/>(Message replay)"]:::messaging
+      end
+      
+      subgraph ExternalAPIs["🌐 External API Adapters"]
+        HTTPAdapter["🌐 HTTP Adapter<br/>(REST client)"]:::external
+        GraphQLAdapter["📊 GraphQL Adapter<br/>(Query client)"]:::external
+        DatabaseAdapter["🗄️ Database Adapter<br/>(SQL/NoSQL client)"]:::external
+      end
+    end
+  end
+
+  %% Component Relationships
+  LifecycleManager --> MessageHandler
+  MessageHandler --> PlanExecutor
+  PlanExecutor --> ToolInvoker
+  ToolInvoker --> SandboxCore
+  
+  StateManager --> IdempotencyManager
+  ErrorHandler --> HealthMonitor
+  ResultProcessor --> CostTracker
+  
+  PermissionEngine --> ProcessManager
+  ResourceLimiter --> TimeoutManager
+  NetworkPolicy --> AuditLogger
+  OutputCapture --> CleanupService
+  
+  ProcessSandbox --> PermissionEngine
+  DockerSandbox --> ResourceLimiter
+  GVisorSandbox --> NetworkPolicy
+  WASMSandbox --> ProcessManager
+  
+  MemoryAdapter --> RetrievalEngine
+  RetrievalEngine --> SummarizationEngine
+  SummarizationEngine --> EmbeddingService
+  
+  ShortTermMemory --> CostAwareRetrieval
+  LongTermMemory --> CacheOptimizer
+  EpisodicMemory --> DataMinimizer
+  
+  HandshakeManager --> DescriptorMapper
+  DescriptorMapper --> StreamHandler
+  StreamHandler --> CircuitBreakerMCP
+  
+  NATSClient --> DurableConsumer
+  DurableConsumer --> BackpressureHandler
+  BackpressureHandler --> ReplayManager
+
+  %% Styling
+  classDef runtime fill:#e8f5e8,stroke:#388e3c,color:#1b5e20;
+  classDef messaging fill:#e0f2f1,stroke:#00796b,color:#004d40;
+  classDef state fill:#e3f2fd,stroke:#1976d2,color:#0d47a1;
+  classDef execution fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+  classDef monitoring fill:#fafafa,stroke:#616161,color:#212121;
+  classDef sandbox fill:#fff3e0,stroke:#f57c00,color:#e65100;
+  classDef security fill:#ffebee,stroke:#d32f2f,color:#b71c1c;
+  classDef memory fill:#e8eaf6,stroke:#3f51b5,color:#1a237e;
+  classDef budget fill:#f1f8e9,stroke:#689f38,color:#33691e;
+  classDef optimization fill:#e0f7fa,stroke:#00acc1,color:#006064;
+  classDef protocol fill:#fce4ec,stroke:#c2185b,color:#880e4f;
+  classDef external fill:#efebe9,stroke:#5d4037,color:#3e2723;
+    </div>
+
+    <h2 id="level4-code">Level 4 — Code & Interfaces</h2>
+    <p class="note">Key Go interfaces and implementation structure showing the contract-based architecture</p>
+    <div class="diagram mermaid">
+classDiagram
+  direction TB
+
+  %% Core Interface Contracts
+  class MessageBus {
+    +Publish(ctx Context, msg Message) error
+    +Subscribe(ctx Context, subject string) Message
+    +Replay(ctx Context, stream string, from time) Messages
+  }
+
+  class AgentRuntime {
+    +OnStart(ctx Context) error
+    +OnMessage(ctx Context, msg Message) error
+    +OnPlan(ctx Context, plan Plan) error
+    +OnFinish(ctx Context) error
+  }
+
+  class Planner {
+    +Plan(ctx Context, goal Goal, state WorkflowState) Plan
+    +Replan(ctx Context, failure PlanFailure, state WorkflowState) Plan
+    +ValidatePlan(ctx Context, plan Plan) error
+  }
+
+  class MemoryStore {
+    +Save(ctx Context, agentID AgentID, record MemoryRecord) error
+    +Query(ctx Context, agentID AgentID, opts QueryOptions) Records
+    +Summarize(ctx Context, agentID AgentID, opts SummarizeOptions) string
+    +GetCosts(ctx Context, agentID AgentID, period TimePeriod) CostReport
+    +SetBudget(ctx Context, agentID AgentID, budget Budget) error
+  }
+
+  class Tool {
+    +ID() string
+    +Schema() ToolSchema
+    +Call(ctx Context, input ToolInput) ToolOutput
+    +RequiredPermissions() Permissions
+  }
+
+  class PlanCostModel {
+    +Estimate(ctx Context, plan Plan) CostEstimate
+    +Calibrate(ctx Context, obs CostObservation) error
+  }
+
+  %% Security Enterprise Interfaces Q2
+  class SecretsProvider {
+    +Get(ctx Context, key string) string
+    +Put(ctx Context, key string, val string) error
+    +Rotate(ctx Context, key string) error
+  }
+
+  class ExecProfileCompiler {
+    +Compile(agent AgentConfig, tool ToolSchema, policies Policies) ExecProfile
+  }
+
+  class AuditHasher {
+    +Chain(previousHash []byte, envelope []byte) []byte
+  }
+
+  class HumanIntervention {
+    +CreateTask(ctx Context, request HumanTaskRequest) TaskID
+    +AwaitResponse(ctx Context, taskID TaskID, timeout Duration) HumanTaskResponse
+    +Escalate(ctx Context, taskID TaskID, level int) error
+  }
+
+  %% Advanced Interfaces Q3
+  class WasmAgent {
+    +LoadWasm(ctx Context, wasmBytes []byte) error
+    +CallWasmFunction(ctx Context, function string, input []byte) []byte
+  }
+
+  class SagaOrchestrator {
+    +BeginSaga(ctx Context, sagaID string, definition SagaDefinition) error
+    +AddStep(ctx Context, sagaID string, step SagaStep) error
+    +Compensate(ctx Context, sagaID string, fromStep int) error
+    +GetSagaStatus(ctx Context, sagaID string) SagaStatus
+  }
+
+  %% Concrete Implementations
+  class NATSMessageBus {
+    -client NatsConn
+    -js JetStreamContext
+    +Publish(ctx Context, msg Message) error
+    +Subscribe(ctx Context, subject string) Message
+    +Replay(ctx Context, stream string, from time) Messages
+  }
+
+  class FSMPlanner {
+    -stateMachine StateMachine
+    -transitions TransitionTable
+    +Plan(ctx Context, goal Goal, state WorkflowState) Plan
+    +ValidatePlan(ctx Context, plan Plan) error
+  }
+
+  class LLMPlanner {
+    -model ModelConfig
+    -constraints PlanConstraints
+    -costModel PlanCostModel
+    +Plan(ctx Context, goal Goal, state WorkflowState) Plan
+    +Replan(ctx Context, failure PlanFailure, state WorkflowState) Plan
+  }
+
+  class BehaviorTreePlanner {
+    -rootNode BTNode
+    -evaluator ExpressionEvaluator
+    +Plan(ctx Context, goal Goal, state WorkflowState) Plan
+    +ValidatePlan(ctx Context, plan Plan) error
+  }
+
+  class PineconeMemory {
+    -client PineconeClient
+    -index string
+    -costTracker CostTracker
+    +Save(ctx Context, agentID AgentID, record MemoryRecord) error
+    +Query(ctx Context, agentID AgentID, opts QueryOptions) Records
+  }
+
+  class VaultSecrets {
+    -client VaultClient
+    -mountPath string
+    +Get(ctx Context, key string) string
+    +Put(ctx Context, key string, val string) error
+    +Rotate(ctx Context, key string) error
+  }
+
+  class MCPToolAdapter {
+    -mcpClient MCPClient
+    -permissionEngine PermissionEngine
+    +ID() string
+    +Schema() ToolSchema
+    +Call(ctx Context, input ToolInput) ToolOutput
+    +RequiredPermissions() Permissions
+  }
+
+  class ProcessSandbox {
+    -execProfile ExecProfile
+    -resourceLimits ResourceLimits
+    +Execute(ctx Context, tool Tool, input ToolInput) ToolOutput
+    +ApplyPermissions(profile ExecProfile) error
+  }
+
+  class GVisorSandbox {
+    -runsc RunscConfig
+    -networkPolicy NetworkPolicy
+    +Execute(ctx Context, tool Tool, input ToolInput) ToolOutput
+    +IsolateProcess(pid int) error
+  }
+
+  %% Model Provider Implementations
+  class OpenAIProvider {
+    -client OpenAIClient
+    -rateLimiter RateLimiter
+    +Complete(ctx Context, prompt Prompt) Completion
+    +Embed(ctx Context, texts []string) []Vector
+  }
+
+  class OllamaProvider {
+    -endpoint string
+    -client HTTPClient
+    +Complete(ctx Context, prompt Prompt) Completion
+    +Embed(ctx Context, texts []string) []Vector
+  }
+
+  %% Implementation Relationships
+  MessageBus <|.. NATSMessageBus
+  Planner <|.. FSMPlanner
+  Planner <|.. LLMPlanner
+  Planner <|.. BehaviorTreePlanner
+  MemoryStore <|.. PineconeMemory
+  SecretsProvider <|.. VaultSecrets
+  Tool <|.. MCPToolAdapter
+
+  %% Composition Relationships
+  LLMPlanner --> PlanCostModel : uses
+  FSMPlanner --> ExecProfileCompiler : uses
+  MCPToolAdapter --> ProcessSandbox : executes via
+  ProcessSandbox --> ExecProfileCompiler : configured by
+
+  %% Advanced Relationships
+  WasmAgent --|> AgentRuntime : extends
+  GVisorSandbox --> AuditHasher : logs via
+  SagaOrchestrator --> HumanIntervention : orchestrates
+    </div>
+
+    <h2 id="deployment-views">Deployment Views</h2>
+    <p class="note">How AgentFlow components are deployed across different environments</p>
+    
+    <h3>Development Deployment</h3>
+    <div class="diagram mermaid">
+flowchart LR
+  subgraph DevMachine["💻 Developer Machine"]
+    direction TB
+    
+    subgraph DevContainer["🐳 Dev Container"]
+      AF["🤖 AgentFlow<br/>(All-in-one)"]
+      CLI["💻 af CLI"]
+    end
+    
+    subgraph LocalServices["🔧 Local Services"]
+      NATS["📨 NATS<br/>(Docker)"]
+      PG["🗄️ PostgreSQL<br/>(Docker)"]
+      Redis["⚡ Redis<br/>(Docker)"]
+    end
+    
+    AF --> NATS
+    AF --> PG  
+    AF --> Redis
+    CLI --> AF
+  end
+  
+  subgraph External["🌐 External (Development)"]
+    OpenAI["🧠 OpenAI<br/>(API)"]
+    GitHub["📚 GitHub<br/>(Templates)"]
+  end
+  
+  AF --> OpenAI
+  AF --> GitHub
+    </div>
+
+    <h3>Production Deployment (Kubernetes)</h3>
+    <div class="diagram mermaid">
+flowchart TB
+  subgraph K8s["☸️ Kubernetes Cluster"]
+    direction TB
+    
+    subgraph Ingress["🌐 Ingress Layer"]
+      LB["⚖️ Load Balancer<br/>(NGINX/Istio)"]
+      TLS["🔒 TLS Termination"]
+    end
+    
+    subgraph ControlPlane["🎛️ Control Plane Namespace"]
+      direction LR
+      API["🌐 API Server<br/>(3 replicas)"]
+      Orchestrator["🎼 Orchestrator<br/>(2 replicas)"]
+      Dashboard["📊 Dashboard<br/>(2 replicas)"]
+    end
+    
+    subgraph DataPlane["⚙️ Data Plane Namespace"]
+      direction LR
+      Workers["🤖 Agent Workers<br/>(Auto-scaling)"]
+      Sandbox["🛡️ Sandbox Nodes<br/>(gVisor enabled)"]
+    end
+    
+    subgraph Storage["💾 Storage Layer"]
+      direction LR
+      PostgresCluster["🗄️ PostgreSQL<br/>(HA Cluster)"]
+      RedisCluster["⚡ Redis Cluster<br/>(Sentinel)"]
+      VectorDB["🧠 Vector DB<br/>(Pinecone/Qdrant)"]
+    end
+    
+    subgraph MessageQueue["📨 Message Infrastructure"]
+      NATSCluster["📨 NATS Cluster<br/>(JetStream HA)"]
+    end
+    
+    subgraph Observability["📊 Observability Stack"]
+      direction LR
+      Prometheus["📊 Prometheus"]
+      Jaeger["🔍 Jaeger"]
+      Grafana["📈 Grafana"]
+    end
+  end
+  
+  subgraph ExternalServices["🌐 External Services"]
+    direction TB
+    Vault["🔐 HashiCorp Vault"]
+    LLMProviders["🧠 LLM Providers<br/>(OpenAI/Anthropic)"]
+    OnPremModels["🏠 On-Prem Models<br/>(vLLM/Ollama)"]
+    MCPServers["🔌 MCP Servers"]
+  end
+  
+  %% Connections
+  LB --> API
+  LB --> Dashboard
+  TLS --> LB
+  
+  API --> Orchestrator
+  API --> PostgresCluster
+  API --> RedisCluster
+  
+  Orchestrator --> NATSCluster
+  Orchestrator --> PostgresCluster
+  
+  Workers --> NATSCluster
+  Workers --> VectorDB
+  Workers --> Sandbox
+  
+  Sandbox --> Vault
+  Sandbox --> MCPServers
+  
+  API --> LLMProviders
+  API --> OnPremModels
+  
+  %% Observability
+  API --> Prometheus
+  Orchestrator --> Prometheus
+  Workers --> Prometheus
+  Prometheus --> Grafana
+  
+  API --> Jaeger
+  Orchestrator --> Jaeger
+  Workers --> Jaeger
+    </div>
+
+    <h2 id="data-flow">Data Flow Diagrams</h2>
+    <p class="note">How data and control flow through the AgentFlow system</p>
+    
+    <h3>Workflow Execution Flow</h3>
+    <div class="diagram mermaid">
+sequenceDiagram
+    participant User
+    participant API as 🌐 API Server
+    participant Orch as 🎼 Orchestrator  
+    participant Planner as 🧠 Planner
+    participant NATS as 📨 NATS
+    participant Worker as 🤖 Worker
+    participant Tool as 🔧 Tool
+    participant Memory as 🧠 Memory
+    participant Audit as 📊 Audit
+
+    User->>API: POST /workflows/{id}/execute
+    API->>API: Validate auth & RBAC
+    API->>Orch: Execute workflow request
+    
+    Orch->>Planner: Generate plan for goal
+    Planner->>Planner: Cost estimation
+    Planner-->>Orch: Plan + cost estimate
+    
+    alt Budget check passes
+        Orch->>NATS: Publish plan messages
+        NATS->>Worker: Deliver plan step
+        
+        Worker->>Worker: Load context from memory
+        Worker->>Memory: Query relevant memories
+        Memory-->>Worker: Retrieved context
+        
+        Worker->>Tool: Execute tool with context
+        Tool->>Tool: Sandboxed execution
+        Tool-->>Worker: Tool output
+        
+        Worker->>Memory: Save execution results
+        Worker->>Audit: Log execution details
+        
+        Worker->>NATS: Publish step completion
+        NATS->>Orch: Step completed notification
+        
+        alt More steps remaining
+            Orch->>NATS: Publish next step
+        else Workflow complete
+            Orch->>API: Workflow completed
+            API-->>User: Success response
+        end
+    else Budget exceeded
+        Orch-->>API: Budget exceeded error
+        API-->>User: Error response
+    end
+    </div>
+
+    <h3>Cost Tracking & Budget Flow</h3>
+    <div class="diagram mermaid">
+flowchart TD
+    subgraph Planning["📋 Planning Phase"]
+        Goal["🎯 User Goal"]
+        CostEst["💰 Cost Estimator"]
+        Budget["💳 Budget Check"]
+    end
+    
+    subgraph Execution["⚡ Execution Phase"]
+        ToolExec["🔧 Tool Execution"]
+        TokenCount["🔢 Token Counter"]
+        CostObs["📊 Cost Observer"]
+    end
+    
+    subgraph Tracking["📈 Cost Tracking"]
+        CostDB["💾 Cost Database"]
+        Analytics["📊 Cost Analytics"]
+        Reports["📋 Cost Reports"]
+    end
+    
+    subgraph Enforcement["🚨 Budget Enforcement"]
+        SoftLimit["⚠️ Soft Limit Warning"]
+        HardLimit["🛑 Hard Limit Block"]
+        Alerts["📧 Cost Alerts"]
+    end
+    
+    Goal --> CostEst
+    CostEst --> Budget
+    Budget --> ToolExec
+    
+    ToolExec --> TokenCount
+    TokenCount --> CostObs
+    CostObs --> CostDB
+    
+    CostDB --> Analytics
+    Analytics --> Reports
+    
+    CostObs --> SoftLimit
+    SoftLimit --> HardLimit
+    HardLimit --> Alerts
+    
+    Budget -.-> SoftLimit
+    CostEst -.-> Analytics
+    </div>
+
+    <h2 id="security-model">Security Architecture</h2>
+    <p class="note">Zero-trust security model with defense in depth</p>
+    <div class="diagram mermaid">
+flowchart TB
+    subgraph SecurityLayers["🛡️ Security Layers"]
+        direction TB
+        
+        subgraph NetworkSec["🌐 Network Security"]
+            TLS["🔒 TLS 1.3<br/>(All connections)"]
+            mTLS["🔐 mTLS<br/>(Service-to-service)"]
+            Firewall["🔥 Network Policies<br/>(Zero-trust)"]
+        end
+        
+        subgraph IdentitySec["🆔 Identity & Access"]
+            AuthN["🔑 Authentication<br/>(OIDC/JWT)"]
+            AuthZ["🛡️ Authorization<br/>(RBAC)"]
+            MFA["📱 Multi-Factor Auth<br/>(Optional)"]
+        end
+        
+        subgraph DataSec["💾 Data Security"]
+            Encryption["🔐 Encryption at Rest<br/>(AES-256)"]
+            Transit["🚚 Encryption in Transit<br/>(TLS)"]
+            Secrets["🔑 Secret Management<br/>(Vault/KMS)"]
+        end
+        
+        subgraph RuntimeSec["⚡ Runtime Security"]
+            Sandbox["🛡️ Tool Sandboxing<br/>(gVisor/Docker)"]
+            Permissions["📜 Permission Model<br/>(Deny-by-default)"]
+            ResourceLimits["⚙️ Resource Limits<br/>(CPU/Memory/Network)"]
+        end
+        
+        subgraph AuditSec["📊 Audit & Compliance"]
+            AuditLog["📋 Audit Logging<br/>(Hash-chained)"]
+            Monitoring["👁️ Security Monitoring<br/>(Anomaly detection)"]
+            Compliance["📄 Compliance Reports<br/>(SOC2/GDPR ready)"]
+        end
+    end
+    
+    subgraph ThreatModel["🎯 Threat Mitigation"]
+        direction LR
+        
+        subgraph Threats["⚠️ Key Threats"]
+            CodeInjection["💉 Code Injection"]
+            DataExfil["📤 Data Exfiltration"]
+            PrivEsc["⬆️ Privilege Escalation"]
+            DDoS["🌊 DDoS/Resource Exhaustion"]
+            InsiderThreat["👤 Insider Threats"]
+        end
+        
+        subgraph Mitigations["🛡️ Mitigations"]
+            InputVal["✅ Input Validation"]
+            EgressControl["🚫 Egress Control"]
+            LeastPriv["🔒 Least Privilege"]
+            RateLimit["⏰ Rate Limiting"]
+            ZeroTrust["🔍 Zero Trust"]
+        end
+    end
+    
+    %% Security Flow
+    CodeInjection --> InputVal
+    CodeInjection --> Sandbox
+    
+    DataExfil --> EgressControl
+    DataExfil --> Encryption
+    
+    PrivEsc --> LeastPriv
+    PrivEsc --> Permissions
+    
+    DDoS --> RateLimit
+    DDoS --> ResourceLimits
+    
+    InsiderThreat --> ZeroTrust
+    InsiderThreat --> AuditLog
+    
+    %% Layer Relationships
+    TLS --> mTLS
+    AuthN --> AuthZ
+    Encryption --> Secrets
+    Sandbox --> Permissions
+    AuditLog --> Monitoring
+    </div>
+
+    <div class="architecture-summary">
+      <h3>Key Architecture Decisions</h3>
+      <ul>
+        <li><strong>Messaging-First:</strong> NATS JetStream provides durable, ordered message delivery with replay capabilities</li>
+        <li><strong>Deterministic Planning:</strong> FSM and Behavior Tree planners ensure reproducible workflows</li>
+        <li><strong>Zero-Trust Security:</strong> Every tool execution is sandboxed with explicit permissions</li>
+        <li><strong>Cost-Aware Design:</strong> Token and resource tracking throughout the execution pipeline</li>
+        <li><strong>Observable by Default:</strong> OpenTelemetry tracing and Prometheus metrics on all components</li>
+        <li><strong>Multi-Tenant from Start:</strong> Tenant isolation enforced at database, message, and execution layers</li>
+        <li><strong>Template-Driven:</strong> YAML-based workflow definitions with marketplace ecosystem</li>
+        <li><strong>Polyglot Support:</strong> WASM runtime enables agents in multiple languages</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <h3>Implementation Notes</h3>
+      <ul>
+        <li><strong>Development:</strong> Run <code>docker-compose up</code> in dev container for local development</li>
+        <li><strong>Production:</strong> Use provided Helm charts for Kubernetes deployment</li>
+        <li><strong>Scaling:</strong> Horizontal pod autoscaling based on message queue depth and CPU utilization</li>
+        <li><strong>Monitoring:</strong> Grafana dashboards included for operations and cost tracking</li>
+        <li><strong>Security:</strong> Regular security scans integrated into CI/CD pipeline</li>
+      </ul>
+    </div>
+
+    <hr />
+    <p class="note">
+      <strong>AgentFlow C4 Architecture Documentation</strong><br/>
+      This document provides comprehensive architectural views for AgentFlow v1.0.<br/>
+      Generated on August 16, 2025 | Open this file in a modern browser with internet access to render Mermaid diagrams.
+    </p>
+  </div>
+</body>
+</html>
