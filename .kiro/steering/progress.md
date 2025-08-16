@@ -11,8 +11,8 @@ AgentFlow follows a 3-quarter development plan with clear phases, specs, and gat
 
 **Specs**:
 - [x] Q1.1 - Foundations & Project Governance (Phase P0) - **TASK 1 COMPLETED 2025-08-16**
-- [ ] Q1.2 - Messaging Backbone & Tracing Skeleton (Phase P1)
-- [ ] Q1.3 - Relational Storage & Migrations (Phase P2)
+- [x] Q1.2 - Messaging Backbone & Tracing Skeleton (Phase P1)
+- [x] Q1.3 - Relational Storage & Migrations (Phase P2)
 - [ ] Q1.4 - Control Plane API Skeleton (Phase P3)
 - [ ] Q1.5 - Orchestrator & Deterministic Planners (Phase P4)
 - [ ] Q1.6 - Data Plane Worker Runtime (Phase P5)

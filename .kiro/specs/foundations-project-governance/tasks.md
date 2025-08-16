@@ -43,7 +43,15 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create CI policy & gating doc
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. Security Tooling Integration (gosec, osv-scanner, gitleaks, syft/grype)
+- [x] 4. Security Tooling Integration (gosec, osv-scanner, gitleaks, syft/grype)
+
+
+
+
+
+
+
+
   - **Implementation**: Create scripts and severity thresholds (fail High/Critical)
   - **Unit Tests**: Parse mock reports and test threshold logic
   - **Manual Testing**: Introduce benign vulnerable lib in branch and ensure failure

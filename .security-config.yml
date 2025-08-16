@@ -1,0 +1,230 @@
+# Security Configuration
+# Configuration file for security scanning tools and thresholds
+
+# Global security settings
+security:
+  # Default severity threshold for failing builds
+  # Options: critical, high, medium, low, info
+  default_threshold: "high"
+  
+  # Enable/disable specific security tools
+  tools:
+    gosec:
+      enabled: true
+      fail_on_error: true
+      severity_threshold: "high"
+      config_file: ".gosec.json"
+      exclude_rules: []
+      
+    govulncheck:
+      enabled: true
+      fail_on_error: true
+      severity_threshold: "high"
+      
+    osv_scanner:
+      enabled: true
+      fail_on_error: true
+      severity_threshold: "high"
+      skip_git: true
+      
+    gitleaks:
+      enabled: true
+      fail_on_error: true
+      config_file: ".gitleaks.toml"
+      
+    syft:
+      enabled: true
+      fail_on_error: false
+      output_formats:
+        - "spdx-json"
+        - "cyclonedx-json"
+        
+    grype:
+      enabled: true
+      fail_on_error: true
+      severity_threshold: "high"
+      output_formats:
+        - "json"
+        - "sarif"
+
+# Tool-specific configurations
+gosec:
+  # gosec configuration
+  severity: "medium"
+  confidence: "medium"
+  exclude_rules:
+    # Exclude rules that are too noisy or not applicable
+    # - "G101" # Look for hard coded credentials
+    # - "G102" # Bind to all interfaces
+    # - "G103" # Audit the use of unsafe block
+  include_rules: []
+  exclude_dirs:
+    - "vendor"
+    - "node_modules"
+    - ".git"
+  exclude_files:
+    - "*_test.go"
+    - "*.pb.go"
+
+gitleaks:
+  # gitleaks configuration
+  title: "AgentFlow Security Scan"
+  extend:
+    # Extend default rules with custom patterns
+    rules:
+      - id: "agentflow-api-key"
+        description: "AgentFlow API Key"
+        regex: 'af_[a-zA-Z0-9]{32}'
+        keywords:
+          - "af_"
+      - id: "custom-secret-pattern"
+        description: "Custom secret pattern"
+        regex: 'secret_[a-zA-Z0-9]{16,}'
+        keywords:
+          - "secret_"
+  allowlist:
+    # Allow specific patterns that are false positives
+    description: "Allowlisted files and patterns"
+    files:
+      - ".security-config.yml"  # This file contains example patterns
+      - "docs/**/*"             # Documentation files
+      - "*.md"                  # Markdown files
+    regexes:
+      - 'EXAMPLE'               # Example credentials
+      - 'placeholder'           # Placeholder values
+      - 'dummy'                 # Dummy values
+    paths:
+      - "test/"                 # Test files
+      - "examples/"             # Example files
+
+grype:
+  # grype configuration
+  output: "json"
+  fail-on-severity: "high"
+  only-fixed: false
+  ignore:
+    # Ignore specific vulnerabilities (use with caution)
+    # - vulnerability: "CVE-2021-12345"
+    #   reason: "False positive - not applicable to our use case"
+    #   expires: "2024-12-31"
+
+# Reporting configuration
+reporting:
+  # Output directory for security reports
+  output_dir: "security-reports"
+  
+  # Report formats to generate
+  formats:
+    - "json"
+    - "sarif"
+    - "html"
+    
+  # Upload reports to security platforms
+  upload:
+    github_security_tab: true
+    defectdojo: false
+    
+  # Notification settings
+  notifications:
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#security"
+    email:
+      enabled: false
+      recipients: []
+
+# CI/CD integration settings
+ci:
+  # Fail build on security issues
+  fail_build: true
+  
+  # Create GitHub issues for new vulnerabilities
+  create_issues: false
+  
+  # Comment on PRs with security scan results
+  pr_comments: true
+  
+  # Security gates for different environments
+  gates:
+    development:
+      threshold: "medium"
+      required_tools: ["gosec", "gitleaks"]
+    staging:
+      threshold: "high"
+      required_tools: ["gosec", "govulncheck", "gitleaks", "grype"]
+    production:
+      threshold: "critical"
+      required_tools: ["gosec", "govulncheck", "gitleaks", "grype", "syft"]
+
+# Exception management
+exceptions:
+  # Process for handling security exceptions
+  approval_required: true
+  
+  # Maximum duration for exceptions (in days)
+  max_duration: 90
+  
+  # Required fields for exception requests
+  required_fields:
+    - "vulnerability_id"
+    - "justification"
+    - "risk_assessment"
+    - "mitigation_plan"
+    - "expiry_date"
+    - "approver"
+  
+  # Auto-approved exception patterns
+  auto_approve:
+    # Development dependencies with low risk
+    - pattern: "devDependency"
+      severity: "low"
+      reason: "Development-only dependency"
+    
+    # Test files with medium or lower severity
+    - pattern: "*_test.go"
+      severity: "medium"
+      reason: "Test file - not in production"
+
+# Compliance requirements
+compliance:
+  # Standards to comply with
+  standards:
+    - "OWASP Top 10"
+    - "CWE Top 25"
+    - "NIST Cybersecurity Framework"
+  
+  # Required security controls
+  controls:
+    - "Static Application Security Testing (SAST)"
+    - "Dependency Vulnerability Scanning"
+    - "Secret Detection"
+    - "Container Security Scanning"
+    - "Software Bill of Materials (SBOM)"
+  
+  # Audit requirements
+  audit:
+    retention_period: "7 years"
+    log_all_scans: true
+    include_metadata: true
+
+# Performance tuning
+performance:
+  # Timeout settings (in minutes)
+  timeouts:
+    gosec: 10
+    govulncheck: 15
+    gitleaks: 5
+    grype: 20
+    syft: 10
+  
+  # Parallel execution settings
+  parallel:
+    enabled: true
+    max_workers: 4
+  
+  # Caching settings
+  cache:
+    enabled: true
+    ttl: "24h"
+    directory: ".security-cache"
