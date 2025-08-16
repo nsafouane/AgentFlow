@@ -58,7 +58,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create security baseline & exception process
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 5. Migration Tooling Decision & Policy (goose + sqlc)
+- [x] 5. Migration Tooling Decision & Policy (goose + sqlc)
+
+
+
+
+
   - **Implementation**: Pin versions, add initial empty migration, and configure sqlc
   - **Unit Tests**: Implement migration linter test and verify sqlc code compiles
   - **Manual Testing**: Run up/down locally with Windows path validation

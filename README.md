@@ -162,6 +162,33 @@ For detailed setup instructions, including Windows/macOS host setup, see [Develo
    task dev
    ```
 
+### Database Migrations
+
+AgentFlow uses goose for database schema management and sqlc for type-safe query generation:
+
+1. **Create new migration**:
+   ```bash
+   make migrate-create NAME=add_user_table
+   # or
+   task migrate-create NAME=add_user_table
+   ```
+
+2. **Run migrations**:
+   ```bash
+   make migrate-up
+   # or
+   task migrate-up
+   ```
+
+3. **Generate type-safe queries**:
+   ```bash
+   make sqlc-generate
+   # or
+   task sqlc-generate
+   ```
+
+For detailed migration policies and procedures, see [Migration Policy](docs/migration-policy.md).
+
 ### Development Workflow
 
 1. **Code Quality**: Run linting before committing

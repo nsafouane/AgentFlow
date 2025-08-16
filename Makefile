@@ -7,7 +7,7 @@
 help: ## Show this help message
 	@echo "AgentFlow Build System"
 	@echo "Available targets:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Build all components
 build: ## Build all AgentFlow components
@@ -61,6 +61,28 @@ security-scan: ## Run security scans
 containers: ## Build container images
 	@echo "Building containers..."
 	@echo "Container builds will be implemented with multi-arch support"
+
+# Database migrations
+migrate-up: ## Run database migrations up
+	@echo "Running database migrations up..."
+	goose -dir migrations postgres "$(DATABASE_URL)" up
+
+migrate-down: ## Rollback last database migration
+	@echo "Rolling back last database migration..."
+	goose -dir migrations postgres "$(DATABASE_URL)" down
+
+migrate-status: ## Show migration status
+	@echo "Checking migration status..."
+	goose -dir migrations postgres "$(DATABASE_URL)" status
+
+migrate-create: ## Create new migration (usage: make migrate-create NAME=migration_name)
+	@echo "Creating new migration: $(NAME)"
+	goose -dir migrations create $(NAME) sql
+
+# Generate type-safe queries
+sqlc-generate: ## Generate type-safe Go code from SQL queries
+	@echo "Generating type-safe queries with sqlc..."
+	sqlc generate
 
 # Clean build artifacts
 clean: ## Clean build artifacts

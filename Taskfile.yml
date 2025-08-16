@@ -135,3 +135,33 @@ tasks:
       - echo "Validating development environment..."
       - go version
       - echo "Environment validation complete"
+
+  migrate-up:
+    desc: Run database migrations up
+    cmds:
+      - echo "Running database migrations up..."
+      - goose -dir migrations postgres "{{.DATABASE_URL}}" up
+
+  migrate-down:
+    desc: Rollback last database migration
+    cmds:
+      - echo "Rolling back last database migration..."
+      - goose -dir migrations postgres "{{.DATABASE_URL}}" down
+
+  migrate-status:
+    desc: Show migration status
+    cmds:
+      - echo "Checking migration status..."
+      - goose -dir migrations postgres "{{.DATABASE_URL}}" status
+
+  migrate-create:
+    desc: Create new migration
+    cmds:
+      - echo "Creating new migration: {{.NAME}}"
+      - goose -dir migrations create {{.NAME}} sql
+
+  sqlc-generate:
+    desc: Generate type-safe Go code from SQL queries
+    cmds:
+      - echo "Generating type-safe queries with sqlc..."
+      - sqlc generate
