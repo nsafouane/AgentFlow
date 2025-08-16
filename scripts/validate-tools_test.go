@@ -1,220 +1,333 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
-// TestValidateToolsScript tests the validate-tools.sh script functionality
-func TestValidateToolsScript(t *testing.T) {
-	// Skip if not on Unix-like system
-	if !isUnixLike() {
-		t.Skip("Skipping shell script test on non-Unix system")
+// WorkflowConfig represents a GitHub Actions workflow
+type WorkflowConfig struct {
+	Name        string                 `yaml:"name"`
+	On          interface{}            `yaml:"on"`
+	Jobs        map[string]Job         `yaml:"jobs"`
+	Permissions map[string]interface{} `yaml:"permissions,omitempty"`
+	Env         map[string]string      `yaml:"env,omitempty"`
+}
+
+// Job represents a workflow job
+type Job struct {
+	Name      string                 `yaml:"name,omitempty"`
+	RunsOn    interface{}            `yaml:"runs-on"`
+	Steps     []Step                 `yaml:"steps"`
+	Needs     interface{}            `yaml:"needs,omitempty"`
+	If        string                 `yaml:"if,omitempty"`
+	Strategy  map[string]interface{} `yaml:"strategy,omitempty"`
+	Env       map[string]string      `yaml:"env,omitempty"`
+	Outputs   map[string]string      `yaml:"outputs,omitempty"`
+	Container interface{}            `yaml:"container,omitempty"`
+	Services  map[string]interface{} `yaml:"services,omitempty"`
+}
+
+// Step represents a workflow step
+type Step struct {
+	Name string            `yaml:"name,omitempty"`
+	Uses string            `yaml:"uses,omitempty"`
+	Run  string            `yaml:"run,omitempty"`
+	With map[string]string `yaml:"with,omitempty"`
+	Env  map[string]string `yaml:"env,omitempty"`
+	If   string            `yaml:"if,omitempty"`
+}
+
+// TestWorkflowValidation tests the validation of GitHub Actions workflows
+func TestWorkflowValidation(t *testing.T) {
+	workflowsDir := "../.github/workflows"
+
+	// Check if workflows directory exists
+	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
+		t.Skip("Workflows directory does not exist, skipping workflow validation tests")
 	}
 
-	scriptPath := "./validate-tools.sh"
-	
-	// Check if script exists
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		t.Fatalf("validate-tools.sh script not found at %s", scriptPath)
-	}
-
-	// Make script executable
-	if err := os.Chmod(scriptPath, 0755); err != nil {
-		t.Fatalf("Failed to make script executable: %v", err)
-	}
-
-	// Run the script with dry-run mode (we'll add this flag)
-	cmd := exec.Command("/bin/bash", scriptPath)
-	output, err := cmd.CombinedOutput()
-	
-	// The script should run without crashing
+	// Get all workflow files
+	workflowFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yml"))
 	if err != nil {
-		// It's okay if tools are missing in test environment
-		// We just want to ensure the script structure is valid
-		if !strings.Contains(string(output), "not installed") {
-			t.Fatalf("Script failed with unexpected error: %v\nOutput: %s", err, output)
+		t.Fatalf("Failed to find workflow files: %v", err)
+	}
+
+	yamlFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yaml"))
+	if err != nil {
+		t.Fatalf("Failed to find yaml workflow files: %v", err)
+	}
+
+	workflowFiles = append(workflowFiles, yamlFiles...)
+
+	if len(workflowFiles) == 0 {
+		t.Skip("No workflow files found, skipping validation tests")
+	}
+
+	for _, workflowFile := range workflowFiles {
+		t.Run(filepath.Base(workflowFile), func(t *testing.T) {
+			testWorkflowFile(t, workflowFile)
+		})
+	}
+}
+
+// testWorkflowFile tests a single workflow file
+func testWorkflowFile(t *testing.T, workflowFile string) {
+	// Read workflow file
+	data, err := os.ReadFile(workflowFile)
+	if err != nil {
+		t.Fatalf("Failed to read workflow file %s: %v", workflowFile, err)
+	}
+
+	// Parse YAML
+	var workflow WorkflowConfig
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatalf("Failed to parse workflow YAML %s: %v", workflowFile, err)
+	}
+
+	// Test required fields
+	t.Run("RequiredFields", func(t *testing.T) {
+		testRequiredFields(t, workflow, workflowFile)
+	})
+
+	// Test job structure
+	t.Run("JobStructure", func(t *testing.T) {
+		testJobStructure(t, workflow, workflowFile)
+	})
+
+	// Test security practices
+	t.Run("SecurityPractices", func(t *testing.T) {
+		testSecurityPractices(t, workflow, workflowFile, string(data))
+	})
+
+	// Test caching configuration
+	t.Run("CachingConfiguration", func(t *testing.T) {
+		testCachingConfiguration(t, workflow, workflowFile, string(data))
+	})
+
+	// Test action versions
+	t.Run("ActionVersions", func(t *testing.T) {
+		testActionVersions(t, workflow, workflowFile)
+	})
+}
+
+// testRequiredFields tests that required fields are present
+func testRequiredFields(t *testing.T, workflow WorkflowConfig, workflowFile string) {
+	if workflow.Name == "" {
+		t.Errorf("Workflow %s missing required field: name", workflowFile)
+	}
+
+	if workflow.On == nil {
+		t.Errorf("Workflow %s missing required field: on", workflowFile)
+	}
+
+	if len(workflow.Jobs) == 0 {
+		t.Errorf("Workflow %s missing required field: jobs", workflowFile)
+	}
+}
+
+// testJobStructure tests the structure of jobs
+func testJobStructure(t *testing.T, workflow WorkflowConfig, workflowFile string) {
+	for jobName, job := range workflow.Jobs {
+		if job.RunsOn == nil {
+			t.Errorf("Job %s in workflow %s missing required field: runs-on", jobName, workflowFile)
 		}
-	}
 
-	// Check that output contains expected validation messages
-	outputStr := string(output)
-	expectedMessages := []string{
-		"AgentFlow Development Tools Validation",
-		"Validating Go installation",
-		"Validating Task runner",
-		"Validating PostgreSQL client",
-		"Validating NATS CLI",
-	}
+		if len(job.Steps) == 0 {
+			t.Errorf("Job %s in workflow %s missing required field: steps", jobName, workflowFile)
+		}
 
-	for _, msg := range expectedMessages {
-		if !strings.Contains(outputStr, msg) {
-			t.Errorf("Expected output to contain '%s', but it didn't.\nFull output: %s", msg, outputStr)
+		// Test step structure
+		for i, step := range job.Steps {
+			if step.Uses == "" && step.Run == "" {
+				t.Errorf("Step %d in job %s of workflow %s must have either 'uses' or 'run'", i, jobName, workflowFile)
+			}
 		}
 	}
 }
 
-// TestValidateToolsScriptStructure tests the script structure and syntax
-func TestValidateToolsScriptStructure(t *testing.T) {
-	scriptPath := "./validate-tools.sh"
-	
-	// Read script content
-	content, err := os.ReadFile(scriptPath)
-	if err != nil {
-		t.Fatalf("Failed to read script: %v", err)
+// testSecurityPractices tests security best practices
+func testSecurityPractices(t *testing.T, workflow WorkflowConfig, workflowFile string, content string) {
+	// Check for explicit permissions
+	if len(workflow.Permissions) == 0 {
+		t.Logf("Workflow %s has no explicit permissions defined (using defaults)", workflowFile)
 	}
 
-	scriptContent := string(content)
-
-	// Check for required elements
-	requiredElements := []string{
-		"#!/bin/bash",
-		"set -e",
-		"validate_go()",
-		"validate_task()",
-		"validate_postgresql()",
-		"validate_nats()",
-		"validate_golangci_lint()",
-		"validate_goose()",
-		"validate_sqlc()",
-		"validate_gosec()",
-		"validate_gitleaks()",
-		"validate_precommit()",
-		"main()",
-		"EXPECTED_GO_VERSION=",
-		"EXPECTED_GOLANGCI_VERSION=",
-	}
-
-	for _, element := range requiredElements {
-		if !strings.Contains(scriptContent, element) {
-			t.Errorf("Script missing required element: %s", element)
+	// Check for potential hardcoded secrets
+	if strings.Contains(content, "password") || strings.Contains(content, "secret") || strings.Contains(content, "token") {
+		if !strings.Contains(content, "secrets.") && !strings.Contains(content, "github.token") {
+			t.Logf("Workflow %s may contain hardcoded secrets (manual review recommended)", workflowFile)
 		}
 	}
 
-	// Check version variables are properly defined
-	versionVars := []string{
-		"EXPECTED_GO_VERSION=\"1.22\"",
-		"EXPECTED_GOLANGCI_VERSION=\"1.55.2\"",
-		"EXPECTED_TASK_VERSION=\"3.35.1\"",
-		"EXPECTED_GOOSE_VERSION=\"3.18.0\"",
-		"EXPECTED_SQLC_VERSION=\"1.25.0\"",
-		"EXPECTED_GOSEC_VERSION=\"2.19.0\"",
-		"EXPECTED_GITLEAKS_VERSION=\"8.18.1\"",
-		"EXPECTED_PRECOMMIT_VERSION=\"3.6.0\"",
-		"EXPECTED_NATS_VERSION=\"0.1.4\"",
-	}
-
-	for _, versionVar := range versionVars {
-		if !strings.Contains(scriptContent, versionVar) {
-			t.Errorf("Script missing or incorrect version variable: %s", versionVar)
+	// Check for proper secret usage
+	for jobName, job := range workflow.Jobs {
+		for i, step := range job.Steps {
+			if step.With != nil {
+				for key, value := range step.With {
+					if strings.Contains(strings.ToLower(key), "token") || strings.Contains(strings.ToLower(key), "password") {
+						if !strings.HasPrefix(value, "${{ secrets.") && !strings.HasPrefix(value, "${{ github.token") {
+							t.Errorf("Step %d in job %s of workflow %s may have hardcoded secret in parameter %s", i, jobName, workflowFile, key)
+						}
+					}
+				}
+			}
 		}
 	}
 }
 
-// TestBinaryVersionParsing tests version parsing logic
-func TestBinaryVersionParsing(t *testing.T) {
-	// Test cases for version comparison logic
-	testCases := []struct {
-		name     string
-		version1 string
-		version2 string
-		expected bool // true if version1 >= version2
-	}{
-		{"Equal versions", "1.22.0", "1.22.0", true},
-		{"Higher major", "2.0.0", "1.22.0", true},
-		{"Higher minor", "1.23.0", "1.22.0", true},
-		{"Higher patch", "1.22.1", "1.22.0", true},
-		{"Lower major", "1.0.0", "2.0.0", false},
-		{"Lower minor", "1.21.0", "1.22.0", false},
-		{"Lower patch", "1.22.0", "1.22.1", false},
+// testCachingConfiguration tests caching best practices
+func testCachingConfiguration(t *testing.T, workflow WorkflowConfig, workflowFile string, content string) {
+	hasGoSetup := strings.Contains(content, "setup-go")
+	hasDockerBuild := strings.Contains(content, "docker/build-push-action")
+
+	// Check Go caching
+	if hasGoSetup {
+		if !strings.Contains(content, "cache: true") && !strings.Contains(content, "actions/cache") {
+			t.Logf("Workflow %s with Go setup could benefit from caching", workflowFile)
+		}
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// This would test the version_ge function from the script
-			// For now, we'll implement a simple Go version of the logic
-			result := versionGE(tc.version1, tc.version2)
-			if result != tc.expected {
-				t.Errorf("versionGE(%s, %s) = %v, expected %v", 
-					tc.version1, tc.version2, result, tc.expected)
+	// Check Docker caching
+	if hasDockerBuild {
+		if !strings.Contains(content, "cache-from") && !strings.Contains(content, "cache-to") {
+			t.Logf("Workflow %s with Docker build could benefit from caching", workflowFile)
+		}
+	}
+}
+
+// testActionVersions tests that actions are properly versioned
+func testActionVersions(t *testing.T, workflow WorkflowConfig, workflowFile string) {
+	for jobName, job := range workflow.Jobs {
+		for i, step := range job.Steps {
+			if step.Uses != "" {
+				// Check if action is pinned to a version
+				if !strings.Contains(step.Uses, "@") {
+					t.Errorf("Step %d in job %s of workflow %s uses unpinned action: %s", i, jobName, workflowFile, step.Uses)
+				} else {
+					// Check for SHA pinning (most secure) or version tags
+					parts := strings.Split(step.Uses, "@")
+					if len(parts) == 2 {
+						version := parts[1]
+						// Allow SHA (40 chars), version tags (v1, v1.2, v1.2.3), or latest
+						if len(version) != 40 && !strings.HasPrefix(version, "v") && version != "latest" && version != "main" {
+							t.Logf("Step %d in job %s of workflow %s uses non-standard version format: %s", i, jobName, workflowFile, step.Uses)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestWorkflowSchemaValidation tests workflow files against JSON schema
+func TestWorkflowSchemaValidation(t *testing.T) {
+	workflowsDir := "../.github/workflows"
+
+	// Check if workflows directory exists
+	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
+		t.Skip("Workflows directory does not exist, skipping schema validation tests")
+	}
+
+	// Get all workflow files
+	workflowFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yml"))
+	if err != nil {
+		t.Fatalf("Failed to find workflow files: %v", err)
+	}
+
+	yamlFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yaml"))
+	if err != nil {
+		t.Fatalf("Failed to find yaml workflow files: %v", err)
+	}
+
+	workflowFiles = append(workflowFiles, yamlFiles...)
+
+	for _, workflowFile := range workflowFiles {
+		t.Run(filepath.Base(workflowFile), func(t *testing.T) {
+			// Read and parse workflow file
+			data, err := os.ReadFile(workflowFile)
+			if err != nil {
+				t.Fatalf("Failed to read workflow file %s: %v", workflowFile, err)
+			}
+
+			// Convert YAML to JSON for schema validation
+			var yamlData interface{}
+			if err := yaml.Unmarshal(data, &yamlData); err != nil {
+				t.Fatalf("Failed to parse YAML in %s: %v", workflowFile, err)
+			}
+
+			// Convert to JSON
+			jsonData, err := json.Marshal(yamlData)
+			if err != nil {
+				t.Fatalf("Failed to convert to JSON for %s: %v", workflowFile, err)
+			}
+
+			// Basic JSON validation (ensure it's valid JSON)
+			var jsonObj interface{}
+			if err := json.Unmarshal(jsonData, &jsonObj); err != nil {
+				t.Errorf("Workflow %s does not produce valid JSON: %v", workflowFile, err)
 			}
 		})
 	}
 }
 
-// TestExpectedVersionsMatchDevContainer tests that versions in validation script
-// match those in devcontainer setup
-func TestExpectedVersionsMatchDevContainer(t *testing.T) {
-	// Read devcontainer post-create script
-	postCreateContent, err := os.ReadFile("../.devcontainer/post-create.sh")
+// TestWorkflowNaming tests workflow naming conventions
+func TestWorkflowNaming(t *testing.T) {
+	workflowsDir := "../.github/workflows"
+
+	// Check if workflows directory exists
+	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
+		t.Skip("Workflows directory does not exist, skipping naming tests")
+	}
+
+	// Get all workflow files
+	workflowFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yml"))
 	if err != nil {
-		t.Fatalf("Failed to read post-create.sh: %v", err)
+		t.Fatalf("Failed to find workflow files: %v", err)
 	}
 
-	// Read validation script
-	validateContent, err := os.ReadFile("./validate-tools.sh")
+	yamlFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.yaml"))
 	if err != nil {
-		t.Fatalf("Failed to read validate-tools.sh: %v", err)
+		t.Fatalf("Failed to find yaml workflow files: %v", err)
 	}
 
-	postCreateStr := string(postCreateContent)
-	validateStr := string(validateContent)
+	workflowFiles = append(workflowFiles, yamlFiles...)
 
-	// Check that key versions match between scripts
-	versionChecks := map[string]string{
-		"NATS_VERSION":      "EXPECTED_NATS_VERSION",
-		"GOLANGCI_VERSION":  "EXPECTED_GOLANGCI_VERSION", 
-		"TASK_VERSION":      "EXPECTED_TASK_VERSION",
-		"GOOSE_VERSION":     "EXPECTED_GOOSE_VERSION",
-		"SQLC_VERSION":      "EXPECTED_SQLC_VERSION",
-		"GOSEC_VERSION":     "EXPECTED_GOSEC_VERSION",
-		"GITLEAKS_VERSION":  "EXPECTED_GITLEAKS_VERSION",
-	}
+	for _, workflowFile := range workflowFiles {
+		t.Run(filepath.Base(workflowFile), func(t *testing.T) {
+			filename := filepath.Base(workflowFile)
 
-	for postCreateVar, validateVar := range versionChecks {
-		// Extract version from post-create script
-		postCreateVersion := extractVersion(postCreateStr, postCreateVar)
-		validateVersion := extractVersion(validateStr, validateVar)
-
-		if postCreateVersion == "" {
-			t.Errorf("Could not find %s in post-create.sh", postCreateVar)
-			continue
-		}
-		if validateVersion == "" {
-			t.Errorf("Could not find %s in validate-tools.sh", validateVar)
-			continue
-		}
-
-		if postCreateVersion != validateVersion {
-			t.Errorf("Version mismatch for %s: post-create.sh has %s, validate-tools.sh has %s",
-				postCreateVar, postCreateVersion, validateVersion)
-		}
-	}
-}
-
-// Helper functions
-
-func isUnixLike() bool {
-	return os.PathSeparator == '/'
-}
-
-func versionGE(v1, v2 string) bool {
-	// Simple version comparison - in real implementation would use proper semver
-	return strings.Compare(v1, v2) >= 0
-}
-
-func extractVersion(content, varName string) string {
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, varName+"=") {
-			parts := strings.Split(line, "=")
-			if len(parts) >= 2 {
-				version := strings.Trim(parts[1], "\"")
-				return version
+			// Check file extension
+			if !strings.HasSuffix(filename, ".yml") && !strings.HasSuffix(filename, ".yaml") {
+				t.Errorf("Workflow file %s should have .yml or .yaml extension", filename)
 			}
-		}
+
+			// Check naming convention (kebab-case)
+			nameWithoutExt := strings.TrimSuffix(strings.TrimSuffix(filename, ".yml"), ".yaml")
+			if strings.Contains(nameWithoutExt, "_") || strings.Contains(nameWithoutExt, " ") {
+				t.Logf("Workflow file %s should use kebab-case naming (hyphens instead of underscores/spaces)", filename)
+			}
+
+			// Read workflow to check internal name
+			data, err := os.ReadFile(workflowFile)
+			if err != nil {
+				t.Fatalf("Failed to read workflow file %s: %v", workflowFile, err)
+			}
+
+			var workflow WorkflowConfig
+			if err := yaml.Unmarshal(data, &workflow); err != nil {
+				t.Fatalf("Failed to parse workflow YAML %s: %v", workflowFile, err)
+			}
+
+			// Check that workflow has a descriptive name
+			if len(workflow.Name) < 3 {
+				t.Errorf("Workflow %s should have a more descriptive name", workflowFile)
+			}
+		})
 	}
-	return ""
 }

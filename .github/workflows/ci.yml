@@ -1,0 +1,313 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.22'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+  packages: write
+  attestations: write
+
+jobs:
+  # Build and Test Job
+  build-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        go-version: ['1.22']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Build all modules
+      run: |
+        make build || task build
+
+    - name: Run tests
+      run: |
+        make test || task test
+
+    - name: Generate coverage report
+      run: |
+        go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+  # Lint Job
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout=5m
+
+  # Security Scans Job
+  security:
+    name: Security Scans
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    # Go Security Checker
+    - name: Run gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec.sarif ./...'
+
+    - name: Upload gosec SARIF file
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: gosec.sarif
+
+    # Secret Detection
+    - name: Run gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+    # Vulnerability Scanning
+    - name: Run OSV Scanner
+      uses: google/osv-scanner-action@v1
+      with:
+        scan-args: |-
+          -r
+          --skip-git
+          .
+
+  # Dependency Check Job
+  dependencies:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Run Nancy (Sonatype dependency check)
+      run: |
+        go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
+
+    - name: Check for known vulnerabilities
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
+  # License Check Job
+  license:
+    name: License Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check licenses
+      uses: fossa-contrib/fossa-action@v3
+      with:
+        api-key: ${{ secrets.FOSSA_API_KEY }}
+
+  # SBOM Generation Job
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: [build-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Install Syft
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Generate SBOM
+      run: |
+        syft packages . -o spdx-json=sbom.spdx.json
+        syft packages . -o cyclonedx-json=sbom.cyclonedx.json
+
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-${{ github.sha }}
+        path: |
+          sbom.spdx.json
+          sbom.cyclonedx.json
+
+  # Container Build and Scan Job
+  container:
+    name: Container Build and Scan
+    runs-on: ubuntu-latest
+    needs: [build-test, security]
+    if: github.event_name != 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker images
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: true
+        sbom: true
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign container images
+      run: |
+        cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+
+    - name: Install Grype
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Scan container image for vulnerabilities
+      run: |
+        grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} --fail-on high
+
+    - name: Generate attestation
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        push-to-registry: true
+
+  # Quality Gate Job
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [build-test, lint, security, dependencies, license]
+    if: always()
+    
+    steps:
+    - name: Check job results
+      run: |
+        if [[ "${{ needs.build-test.result }}" != "success" ]]; then
+          echo "Build and test failed"
+          exit 1
+        fi
+        if [[ "${{ needs.lint.result }}" != "success" ]]; then
+          echo "Lint failed"
+          exit 1
+        fi
+        if [[ "${{ needs.security.result }}" != "success" ]]; then
+          echo "Security scans failed"
+          exit 1
+        fi
+        if [[ "${{ needs.dependencies.result }}" != "success" ]]; then
+          echo "Dependency check failed"
+          exit 1
+        fi
+        if [[ "${{ needs.license.result }}" != "success" ]]; then
+          echo "License check failed"
+          exit 1
+        fi
+        echo "All quality gates passed!"
