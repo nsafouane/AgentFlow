@@ -239,4 +239,15 @@ Please read our contributing guidelines and ensure all builds pass on supported 
 
 ## License
 
-[License information will be added]
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+Apache 2.0 is an OSI-approved open source license that allows:
+- ✅ Commercial use
+- ✅ Modification  
+- ✅ Distribution
+- ✅ Private use
+- ✅ Patent use
+
+The license requires:
+- 📄 License and copyright notice
+- 📝 State changes made to the code
