@@ -174,7 +174,16 @@ The following tasks ensure all Gate G0 criteria are met:
   - **Documentation**: Devcontainer adoption guide
   - _Requirements: 11.3_
 
-- [ ] 14. SBOM & Provenance Validation
+- [x] 14. SBOM & Provenance Validation
+
+
+
+
+
+
+
+
+
   - **Implementation**: Ensure artifacts published per build include SBOM & provenance
   - **Unit Tests**: Validate SBOM generation and provenance attestation
   - **Manual Testing**: Verify published artifacts contain required metadata
