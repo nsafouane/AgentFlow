@@ -1,7 +1,12 @@
 # AgentFlow Makefile
 # Cross-platform build automation for AgentFlow
 
-.PHONY: help build test lint clean dev deps security-scan containers
+# Container registry configuration
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= agentflow/agentflow
+TAG ?= latest
+
+.PHONY: help build test lint clean dev deps security-scan containers containers-local containers-push
 
 # Default target
 help: ## Show this help message
@@ -59,8 +64,33 @@ security-scan: ## Run security scans
 
 # Container builds
 containers: ## Build container images
-	@echo "Building containers..."
-	@echo "Container builds will be implemented with multi-arch support"
+	@echo "Building multi-arch containers..."
+	docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/control-plane:latest -f cmd/control-plane/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/worker:latest -f cmd/worker/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/af:latest -f cmd/af/Dockerfile .
+	@echo "Multi-arch container builds complete"
+
+containers-local: ## Build container images for local platform
+	@echo "Building containers for local platform..."
+	docker build -t agentflow/control-plane:latest -f cmd/control-plane/Dockerfile .
+	docker build -t agentflow/worker:latest -f cmd/worker/Dockerfile .
+	docker build -t agentflow/af:latest -f cmd/af/Dockerfile .
+	@echo "Local container builds complete"
+
+containers-push: ## Build and push container images
+	@echo "Building and pushing multi-arch containers..."
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(REGISTRY)/$(IMAGE_NAME)/control-plane:$(TAG) -f cmd/control-plane/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(REGISTRY)/$(IMAGE_NAME)/worker:$(TAG) -f cmd/worker/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(REGISTRY)/$(IMAGE_NAME)/af:$(TAG) -f cmd/af/Dockerfile .
+	@echo "Multi-arch container push complete"
+
+test-containers: ## Test container builds, signatures, and SBOM
+	@echo "Testing container builds..."
+	@if command -v bash >/dev/null 2>&1; then \
+		bash scripts/test-container-build.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File scripts/test-container-build.ps1; \
+	fi
 
 # Database migrations
 migrate-up: ## Run database migrations up

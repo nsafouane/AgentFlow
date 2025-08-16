@@ -81,10 +81,46 @@ tasks:
       - echo "Security scanning will be implemented with gosec, osv-scanner, etc."
 
   containers:
-    desc: Build container images
+    desc: Build multi-arch container images
     cmds:
-      - echo "Building containers..."
-      - echo "Container builds will be implemented with multi-arch support"
+      - echo "Building multi-arch containers..."
+      - docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/control-plane:latest -f cmd/control-plane/Dockerfile .
+      - docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/worker:latest -f cmd/worker/Dockerfile .
+      - docker buildx build --platform linux/amd64,linux/arm64 -t agentflow/af:latest -f cmd/af/Dockerfile .
+      - echo "Multi-arch container builds complete"
+
+  containers-local:
+    desc: Build container images for local platform
+    cmds:
+      - echo "Building containers for local platform..."
+      - docker build -t agentflow/control-plane:latest -f cmd/control-plane/Dockerfile .
+      - docker build -t agentflow/worker:latest -f cmd/worker/Dockerfile .
+      - docker build -t agentflow/af:latest -f cmd/af/Dockerfile .
+      - echo "Local container builds complete"
+
+  containers-push:
+    desc: Build and push container images
+    vars:
+      REGISTRY: '{{.REGISTRY | default "ghcr.io"}}'
+      IMAGE_NAME: '{{.IMAGE_NAME | default "agentflow/agentflow"}}'
+      TAG: '{{.TAG | default "latest"}}'
+    cmds:
+      - echo "Building and pushing multi-arch containers..."
+      - docker buildx build --platform linux/amd64,linux/arm64 --push -t {{.REGISTRY}}/{{.IMAGE_NAME}}/control-plane:{{.TAG}} -f cmd/control-plane/Dockerfile .
+      - docker buildx build --platform linux/amd64,linux/arm64 --push -t {{.REGISTRY}}/{{.IMAGE_NAME}}/worker:{{.TAG}} -f cmd/worker/Dockerfile .
+      - docker buildx build --platform linux/amd64,linux/arm64 --push -t {{.REGISTRY}}/{{.IMAGE_NAME}}/af:{{.TAG}} -f cmd/af/Dockerfile .
+      - echo "Multi-arch container push complete"
+
+  test-containers:
+    desc: Test container builds, signatures, and SBOM
+    cmds:
+      - echo "Testing container builds..."
+      - |
+        {{if eq OS "windows"}}
+        powershell -ExecutionPolicy Bypass -File scripts/test-container-build.ps1
+        {{else}}
+        bash scripts/test-container-build.sh
+        {{end}}
 
   clean:
     desc: Clean build artifacts

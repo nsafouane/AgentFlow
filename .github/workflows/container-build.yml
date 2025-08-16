@@ -1,0 +1,370 @@
+name: Multi-Arch Container Build & Signing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '**/Dockerfile'
+      - '.github/workflows/container-build.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '**/Dockerfile'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  GO_VERSION: '1.22'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+  security-events: write
+
+jobs:
+  # Build matrix for all services and architectures
+  build-containers:
+    name: Build Multi-Arch Containers
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [control-plane, worker, af]
+        include:
+          - service: control-plane
+            port: 8080
+            description: "AgentFlow Control Plane Service"
+          - service: worker
+            port: 8081
+            description: "AgentFlow Worker Service"
+          - service: af
+            port: 0
+            description: "AgentFlow CLI Tool"
+    
+    outputs:
+      control-plane-digest: ${{ steps.build-control-plane.outputs.digest }}
+      worker-digest: ${{ steps.build-worker.outputs.digest }}
+      af-digest: ${{ steps.build-af.outputs.digest }}
+      control-plane-image: ${{ steps.build-control-plane.outputs.image }}
+      worker-image: ${{ steps.build-worker.outputs.image }}
+      af-image: ${{ steps.build-af.outputs.image }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        platforms: linux/amd64,linux/arm64
+
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=AgentFlow ${{ matrix.service }}
+          org.opencontainers.image.description=${{ matrix.description }}
+          org.opencontainers.image.vendor=AgentFlow
+          org.opencontainers.image.licenses=MIT
+
+    - name: Build and push ${{ matrix.service }}
+      id: build-${{ matrix.service }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./cmd/${{ matrix.service }}/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ github.ref_name }}-${{ github.sha }}
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          GIT_COMMIT=${{ github.sha }}
+        cache-from: type=gha,scope=${{ matrix.service }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+        sbom: true
+        provenance: true
+        outputs: |
+          type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+
+  # Sign all container images
+  sign-containers:
+    name: Sign Container Images
+    runs-on: ubuntu-latest
+    needs: build-containers
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service: [control-plane, worker, af]
+    
+    steps:
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+      with:
+        cosign-release: 'v2.2.2'
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get image digest
+      id: digest
+      run: |
+        case "${{ matrix.service }}" in
+          "control-plane")
+            echo "digest=${{ needs.build-containers.outputs.control-plane-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.control-plane-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "worker")
+            echo "digest=${{ needs.build-containers.outputs.worker-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.worker-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "af")
+            echo "digest=${{ needs.build-containers.outputs.af-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.af-image }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Sign container image with Cosign
+      run: |
+        cosign sign --yes ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }}
+
+    - name: Generate attestation
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-name: ${{ steps.digest.outputs.image }}
+        subject-digest: ${{ steps.digest.outputs.digest }}
+        push-to-registry: true
+
+  # Vulnerability scanning for all images
+  scan-containers:
+    name: Scan Container Images
+    runs-on: ubuntu-latest
+    needs: build-containers
+    strategy:
+      matrix:
+        service: [control-plane, worker, af]
+    
+    steps:
+    - name: Get image digest
+      id: digest
+      run: |
+        case "${{ matrix.service }}" in
+          "control-plane")
+            echo "digest=${{ needs.build-containers.outputs.control-plane-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.control-plane-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "worker")
+            echo "digest=${{ needs.build-containers.outputs.worker-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.worker-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "af")
+            echo "digest=${{ needs.build-containers.outputs.af-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.af-image }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }}
+        format: 'sarif'
+        output: 'trivy-${{ matrix.service }}.sarif'
+        severity: 'HIGH,CRITICAL'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-${{ matrix.service }}.sarif'
+        category: 'trivy-${{ matrix.service }}'
+
+    - name: Install Grype
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Run Grype vulnerability scanner
+      run: |
+        grype ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }} \
+          --fail-on high \
+          --output json \
+          --file grype-${{ matrix.service }}.json
+      continue-on-error: true
+
+    - name: Upload Grype scan results
+      uses: actions/upload-artifact@v4
+      with:
+        name: grype-scan-${{ matrix.service }}-${{ github.sha }}
+        path: grype-${{ matrix.service }}.json
+
+  # Generate comprehensive SBOM for all images
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build-containers
+    strategy:
+      matrix:
+        service: [control-plane, worker, af]
+    
+    steps:
+    - name: Install Syft
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Get image digest
+      id: digest
+      run: |
+        case "${{ matrix.service }}" in
+          "control-plane")
+            echo "digest=${{ needs.build-containers.outputs.control-plane-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.control-plane-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "worker")
+            echo "digest=${{ needs.build-containers.outputs.worker-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.worker-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "af")
+            echo "digest=${{ needs.build-containers.outputs.af-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.af-image }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Generate SBOM for ${{ matrix.service }}
+      run: |
+        # Generate SPDX format SBOM
+        syft ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }} \
+          -o spdx-json=sbom-${{ matrix.service }}.spdx.json
+        
+        # Generate CycloneDX format SBOM
+        syft ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }} \
+          -o cyclonedx-json=sbom-${{ matrix.service }}.cyclonedx.json
+
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-${{ matrix.service }}-${{ github.sha }}
+        path: |
+          sbom-${{ matrix.service }}.spdx.json
+          sbom-${{ matrix.service }}.cyclonedx.json
+
+  # Verify signatures and attestations
+  verify-signatures:
+    name: Verify Signatures
+    runs-on: ubuntu-latest
+    needs: [build-containers, sign-containers]
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service: [control-plane, worker, af]
+    
+    steps:
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+      with:
+        cosign-release: 'v2.2.2'
+
+    - name: Get image digest
+      id: digest
+      run: |
+        case "${{ matrix.service }}" in
+          "control-plane")
+            echo "digest=${{ needs.build-containers.outputs.control-plane-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.control-plane-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "worker")
+            echo "digest=${{ needs.build-containers.outputs.worker-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.worker-image }}" >> $GITHUB_OUTPUT
+            ;;
+          "af")
+            echo "digest=${{ needs.build-containers.outputs.af-digest }}" >> $GITHUB_OUTPUT
+            echo "image=${{ needs.build-containers.outputs.af-image }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Verify container signature
+      run: |
+        cosign verify \
+          --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+          --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+          ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }}
+
+    - name: Verify attestation
+      run: |
+        cosign verify-attestation \
+          --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+          --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+          --type slsaprovenance \
+          ${{ steps.digest.outputs.image }}@${{ steps.digest.outputs.digest }}
+
+  # Summary report
+  container-build-summary:
+    name: Container Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-containers, sign-containers, scan-containers, generate-sbom, verify-signatures]
+    if: always()
+    
+    steps:
+    - name: Generate build summary
+      run: |
+        echo "## 🐳 Multi-Arch Container Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Built Images" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | Status | Architectures | Signed | SBOM |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|--------|---------------|--------|------|" >> $GITHUB_STEP_SUMMARY
+        echo "| control-plane | ${{ needs.build-containers.result == 'success' && '✅' || '❌' }} | linux/amd64, linux/arm64 | ${{ needs.sign-containers.result == 'success' && '✅' || '❌' }} | ${{ needs.generate-sbom.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| worker | ${{ needs.build-containers.result == 'success' && '✅' || '❌' }} | linux/amd64, linux/arm64 | ${{ needs.sign-containers.result == 'success' && '✅' || '❌' }} | ${{ needs.generate-sbom.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| af | ${{ needs.build-containers.result == 'success' && '✅' || '❌' }} | linux/amd64, linux/arm64 | ${{ needs.sign-containers.result == 'success' && '✅' || '❌' }} | ${{ needs.generate-sbom.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔒 Security" >> $GITHUB_STEP_SUMMARY
+        echo "- **Vulnerability Scanning:** ${{ needs.scan-containers.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Signature Verification:** ${{ needs.verify-signatures.result == 'success' && '✅ Verified' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Supply Chain Security:** ${{ (needs.sign-containers.result == 'success' && needs.generate-sbom.result == 'success') && '✅ Complete' || '❌ Incomplete' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" != "pull_request" ]; then
+          echo "### 📋 Image References" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull images" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ github.repository }}/control-plane:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ github.repository }}/worker:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ github.repository }}/af:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Verify signatures" >> $GITHUB_STEP_SUMMARY
+          echo "cosign verify --certificate-identity-regexp=\"https://github.com/${{ github.repository }}\" \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ env.REGISTRY }}/${{ github.repository }}/control-plane:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi

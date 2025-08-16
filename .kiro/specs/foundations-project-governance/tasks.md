@@ -95,7 +95,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create RELEASE.md (versioning & branching model)
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 8. Multi-Arch Container Build & Signing (Foundational)
+- [x] 8. Multi-Arch Container Build & Signing (Foundational)
+
+
+
+
+
   - **Implementation**: Build amd64 + arm64 images (linux) for core services with cosign keyless signing + SBOM attestation integrated in CI
   - **Unit Tests**: Implement manifest list inspection test and signature presence test
   - **Manual Testing**: Pull signed image and verify cosign signature
