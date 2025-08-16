@@ -164,9 +164,12 @@ tasks:
       GOOS: linux
       GOARCH: amd64
     cmds:
-      - go build -o {{.BIN_DIR}}/linux/control-plane ./cmd/control-plane
-      - go build -o {{.BIN_DIR}}/linux/worker ./cmd/worker
-      - go build -o {{.BIN_DIR}}/linux/af ./cmd/af
+      - echo "Building for Linux..."
+      - mkdir -p {{.BIN_DIR}}/linux
+      - cd cmd/control-plane && go build -o ../../{{.BIN_DIR}}/linux/control-plane .
+      - cd cmd/worker && go build -o ../../{{.BIN_DIR}}/linux/worker .
+      - cd cmd/af && go build -o ../../{{.BIN_DIR}}/linux/af .
+      - echo "Linux builds complete"
 
   build-windows:
     desc: Build for Windows
@@ -174,15 +177,54 @@ tasks:
       GOOS: windows
       GOARCH: amd64
     cmds:
-      - go build -o {{.BIN_DIR}}/windows/control-plane.exe ./cmd/control-plane
-      - go build -o {{.BIN_DIR}}/windows/worker.exe ./cmd/worker
-      - go build -o {{.BIN_DIR}}/windows/af.exe ./cmd/af
+      - echo "Building for Windows..."
+      - mkdir -p {{.BIN_DIR}}/windows
+      - cd cmd/control-plane && go build -o ../../{{.BIN_DIR}}/windows/control-plane.exe .
+      - cd cmd/worker && go build -o ../../{{.BIN_DIR}}/windows/worker.exe .
+      - cd cmd/af && go build -o ../../{{.BIN_DIR}}/windows/af.exe .
+      - echo "Windows builds complete"
+
+  build-darwin:
+    desc: Build for macOS
+    env:
+      GOOS: darwin
+      GOARCH: amd64
+    cmds:
+      - echo "Building for macOS..."
+      - mkdir -p {{.BIN_DIR}}/darwin
+      - cd cmd/control-plane && go build -o ../../{{.BIN_DIR}}/darwin/control-plane .
+      - cd cmd/worker && go build -o ../../{{.BIN_DIR}}/darwin/worker .
+      - cd cmd/af && go build -o ../../{{.BIN_DIR}}/darwin/af .
+      - echo "macOS builds complete"
 
   build-all:
     desc: Build for all platforms
     cmds:
       - task: build-linux
       - task: build-windows
+      - task: build-darwin
+
+  test-cross-platform:
+    desc: Test cross-platform builds
+    cmds:
+      - echo "Running cross-platform build tests..."
+      - |
+        {{if eq OS "windows"}}
+        powershell -ExecutionPolicy Bypass -File scripts/test-cross-platform-build.ps1
+        {{else}}
+        bash scripts/test-cross-platform-build.sh
+        {{end}}
+
+  validate-cross-platform:
+    desc: Validate cross-platform build compatibility
+    cmds:
+      - echo "Validating cross-platform build compatibility..."
+      - |
+        {{if eq OS "windows"}}
+        powershell -ExecutionPolicy Bypass -File scripts/test-cross-platform-build.ps1
+        {{else}}
+        bash scripts/test-cross-platform-build.sh
+        {{end}}
 
   validate:
     desc: Validate development environment

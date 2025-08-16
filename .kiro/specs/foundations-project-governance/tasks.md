@@ -119,7 +119,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Update CONTRIBUTING.md referencing ADR & risk processes
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 10. Operational Runbook Seed
+- [x] 10. Operational Runbook Seed
+
+
+
+
+
   - **Implementation**: Create /docs/runbooks/index.md with placeholders (build failure, message backlog, cost spike) linking to future specs
   - **Unit Tests**: Implement link checker that passes
   - **Manual Testing**: Validate discoverability from root README
@@ -130,21 +135,39 @@ This implementation plan converts the Foundations & Project Governance design in
 
 The following tasks ensure all Gate G0 criteria are met:
 
-- [ ] 11. CI Green Including Security Scans Validation
+- [x] 11. CI Green Including Security Scans Validation
+
+
+
+
+
+
+
+
   - **Implementation**: Ensure all workflows pass with no High/Critical vulnerabilities
   - **Unit Tests**: Validate CI workflow success and security scan thresholds
   - **Manual Testing**: Verify complete CI pipeline execution without security failures
   - **Documentation**: Document CI green validation procedures
   - _Requirements: 11.1_
 
-- [ ] 12. Cross-Platform Builds Validation
+- [x] 12. Cross-Platform Builds Validation
+
+
+
+
+
   - **Implementation**: Ensure Linux + Windows + WSL2 builds succeed
   - **Unit Tests**: Automated cross-platform build validation tests
   - **Manual Testing**: Execute builds on all supported platforms
   - **Documentation**: Cross-platform build troubleshooting guide
   - _Requirements: 11.2_
 
-- [ ] 13. Devcontainer Adoption Validation
+- [x] 13. Devcontainer Adoption Validation
+
+
+
+
+
   - **Implementation**: Ensure `af validate` warns outside container
   - **Unit Tests**: Test warning logic for container vs host execution
   - **Manual Testing**: Run `af validate` on host and verify warning display

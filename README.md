@@ -137,7 +137,7 @@ The fastest way to get started is using our pre-configured VS Code devcontainer:
    af validate
    ```
 
-For detailed setup instructions, including Windows/macOS host setup, see [Development Environment Guide](docs/dev-environment.md).
+For detailed setup instructions, including Windows/macOS host setup, see [Development Environment Guide](docs/dev-environment.md). For devcontainer adoption guidance, see [Devcontainer Adoption Guide](docs/devcontainer-adoption-guide.md).
 
 ### CLI Usage
 
@@ -215,6 +215,23 @@ For detailed migration policies and procedures, see [Migration Policy](docs/migr
    ```bash
    make build-all
    ```
+
+## Documentation
+
+### Architecture & Design
+- [Architecture Documentation](docs/ARCHITECTURE.md) - System architecture and design decisions
+- [ADR Directory](docs/adr/) - Architecture Decision Records
+- [Risk Register](docs/risk-register.yaml) - Project risk management
+
+### Development Guides
+- [Development Environment Guide](docs/dev-environment.md) - Detailed setup instructions
+- [CLI Quickstart Guide](docs/cli-quickstart.md) - Command-line tool usage
+- [Migration Policy](docs/migration-policy.md) - Database schema management
+
+### Operations & Troubleshooting
+- [Operational Runbooks](docs/runbooks/) - Troubleshooting and maintenance procedures
+- [Security Baseline](docs/security-baseline.md) - Security policies and procedures
+- [CI Policy & Gating](docs/ci-policy.md) - Continuous integration guidelines
 
 ## Contributing
 

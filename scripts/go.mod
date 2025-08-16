@@ -1,4 +1,4 @@
-module version-tests
+module agentflow-scripts
 
 go 1.22
 

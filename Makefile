@@ -141,13 +141,44 @@ clean: ## Clean build artifacts
 
 # Cross-platform builds
 build-linux: ## Build for Linux
-	GOOS=linux GOARCH=amd64 go build -o bin/linux/control-plane ./cmd/control-plane
-	GOOS=linux GOARCH=amd64 go build -o bin/linux/worker ./cmd/worker
-	GOOS=linux GOARCH=amd64 go build -o bin/linux/af ./cmd/af
+	@echo "Building for Linux..."
+	@mkdir -p bin/linux
+	cd cmd/control-plane && GOOS=linux GOARCH=amd64 go build -o ../../bin/linux/control-plane .
+	cd cmd/worker && GOOS=linux GOARCH=amd64 go build -o ../../bin/linux/worker .
+	cd cmd/af && GOOS=linux GOARCH=amd64 go build -o ../../bin/linux/af .
+	@echo "Linux builds complete"
 
 build-windows: ## Build for Windows
-	GOOS=windows GOARCH=amd64 go build -o bin/windows/control-plane.exe ./cmd/control-plane
-	GOOS=windows GOARCH=amd64 go build -o bin/windows/worker.exe ./cmd/worker
-	GOOS=windows GOARCH=amd64 go build -o bin/windows/af.exe ./cmd/af
+	@echo "Building for Windows..."
+	@mkdir -p bin/windows
+	cd cmd/control-plane && GOOS=windows GOARCH=amd64 go build -o ../../bin/windows/control-plane.exe .
+	cd cmd/worker && GOOS=windows GOARCH=amd64 go build -o ../../bin/windows/worker.exe .
+	cd cmd/af && GOOS=windows GOARCH=amd64 go build -o ../../bin/windows/af.exe .
+	@echo "Windows builds complete"
 
-build-all: build-linux build-windows ## Build for all platforms
+build-darwin: ## Build for macOS
+	@echo "Building for macOS..."
+	@mkdir -p bin/darwin
+	cd cmd/control-plane && GOOS=darwin GOARCH=amd64 go build -o ../../bin/darwin/control-plane .
+	cd cmd/worker && GOOS=darwin GOARCH=amd64 go build -o ../../bin/darwin/worker .
+	cd cmd/af && GOOS=darwin GOARCH=amd64 go build -o ../../bin/darwin/af .
+	@echo "macOS builds complete"
+
+build-all: build-linux build-windows build-darwin ## Build for all platforms
+
+# Cross-platform build validation
+test-cross-platform: ## Test cross-platform builds
+	@echo "Running cross-platform build tests..."
+	@if command -v bash >/dev/null 2>&1; then \
+		bash scripts/test-cross-platform-build.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File scripts/test-cross-platform-build.ps1; \
+	fi
+
+validate-cross-platform: ## Validate cross-platform build compatibility
+	@echo "Validating cross-platform build compatibility..."
+	@if command -v bash >/dev/null 2>&1; then \
+		bash scripts/test-cross-platform-build.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File scripts/test-cross-platform-build.ps1; \
+	fi

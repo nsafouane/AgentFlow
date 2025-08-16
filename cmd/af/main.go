@@ -86,8 +86,12 @@ func validateEnvironment() {
 
 	// Add container warning if not in container
 	if result.Environment.Container == "host" {
-		result.Warnings = append(result.Warnings, 
+		result.Warnings = append(result.Warnings,
 			"Running on host system. Consider using VS Code devcontainer for consistent environment.")
+		result.Warnings = append(result.Warnings,
+			"Devcontainer provides standardized tooling, dependencies, and configuration.")
+		result.Warnings = append(result.Warnings,
+			"To use devcontainer: Open this project in VS Code and select 'Reopen in Container'.")
 	}
 
 	// Output JSON

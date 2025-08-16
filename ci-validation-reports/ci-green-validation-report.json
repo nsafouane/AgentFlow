@@ -1,0 +1,15 @@
+{
+  "security_threshold": "critical",
+  "git_branch": "master",
+  "timestamp": "2025-08-16T14:54:23Z",
+  "validations": [
+    "Security Thresholds: PASSED - High/Critical severity thresholds configured in workflows",
+    "Security Tools: PASSED - 5/5 required security tools found in workflows",
+    "SARIF Upload: PASSED - SARIF upload configuration found in workflows"
+  ],
+  "github_repository": "https://github.com/nsafouane/AgentFlow.git",
+  "total_validations": 3,
+  "validation_status": "PASSED",
+  "reports_directory": "C:\\Users\\Dell\\Desktop\\AgentFlow\\ci-validation-reports",
+  "git_commit": "82061982083801e90c2b2e981f5a27b07543d89e"
+}

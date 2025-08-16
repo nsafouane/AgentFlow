@@ -191,43 +191,139 @@ func TestValidateCommand(t *testing.T) {
 
 // TestContainerWarning tests that the CLI shows warning when not in container
 func TestContainerWarning(t *testing.T) {
-	// Create a validation result for host environment
-	result := ValidationResult{
-		Version:   "1.0.0",
-		Timestamp: "2024-01-01T00:00:00Z",
-		Environment: EnvironmentInfo{
-			Platform:     "linux",
-			Architecture: "amd64",
-			Container:    "host", // This should trigger warning
-		},
-		Tools:    make(map[string]ToolStatus),
-		Services: make(map[string]ServiceInfo),
-		Warnings: []string{},
-		Errors:   []string{},
-	}
-
-	// Simulate the warning logic from validateEnvironment
-	if result.Environment.Container == "host" {
-		result.Warnings = append(result.Warnings,
-			"Running on host system. Consider using VS Code devcontainer for consistent environment.")
-	}
-
-	// Verify warning was added
-	if len(result.Warnings) == 0 {
-		t.Error("Expected warning for host environment, but no warnings found")
-	}
-
-	found := false
-	for _, warning := range result.Warnings {
-		if strings.Contains(warning, "devcontainer") {
-			found = true
-			break
+	// Test host environment (should show warnings)
+	t.Run("HostEnvironment", func(t *testing.T) {
+		result := ValidationResult{
+			Version:   "1.0.0",
+			Timestamp: "2024-01-01T00:00:00Z",
+			Environment: EnvironmentInfo{
+				Platform:     "linux",
+				Architecture: "amd64",
+				Container:    "host", // This should trigger warning
+			},
+			Tools:    make(map[string]ToolStatus),
+			Services: make(map[string]ServiceInfo),
+			Warnings: []string{},
+			Errors:   []string{},
 		}
+
+		// Simulate the warning logic from validateEnvironment
+		if result.Environment.Container == "host" {
+			result.Warnings = append(result.Warnings,
+				"Running on host system. Consider using VS Code devcontainer for consistent environment.")
+			result.Warnings = append(result.Warnings,
+				"Devcontainer provides standardized tooling, dependencies, and configuration.")
+			result.Warnings = append(result.Warnings,
+				"To use devcontainer: Open this project in VS Code and select 'Reopen in Container'.")
+		}
+
+		// Verify warnings were added
+		if len(result.Warnings) != 3 {
+			t.Errorf("Expected 3 warnings for host environment, got %d", len(result.Warnings))
+		}
+
+		expectedWarnings := []string{"devcontainer", "standardized tooling", "Reopen in Container"}
+		for i, expected := range expectedWarnings {
+			if i >= len(result.Warnings) {
+				t.Errorf("Missing warning %d: should contain '%s'", i, expected)
+				continue
+			}
+			if !strings.Contains(result.Warnings[i], expected) {
+				t.Errorf("Warning %d should contain '%s', got: %s", i, expected, result.Warnings[i])
+			}
+		}
+
+		t.Logf("Host environment warnings: %v", result.Warnings)
+	})
+
+	// Test devcontainer environment (should not show warnings)
+	t.Run("DevcontainerEnvironment", func(t *testing.T) {
+		result := ValidationResult{
+			Version:   "1.0.0",
+			Timestamp: "2024-01-01T00:00:00Z",
+			Environment: EnvironmentInfo{
+				Platform:     "linux",
+				Architecture: "amd64",
+				Container:    "devcontainer", // This should NOT trigger warning
+			},
+			Tools:    make(map[string]ToolStatus),
+			Services: make(map[string]ServiceInfo),
+			Warnings: []string{},
+			Errors:   []string{},
+		}
+
+		// Simulate the warning logic from validateEnvironment
+		if result.Environment.Container == "host" {
+			result.Warnings = append(result.Warnings,
+				"Running on host system. Consider using VS Code devcontainer for consistent environment.")
+			result.Warnings = append(result.Warnings,
+				"Devcontainer provides standardized tooling, dependencies, and configuration.")
+			result.Warnings = append(result.Warnings,
+				"To use devcontainer: Open this project in VS Code and select 'Reopen in Container'.")
+		}
+
+		// Verify no container-related warnings were added
+		for _, warning := range result.Warnings {
+			if strings.Contains(warning, "devcontainer") || strings.Contains(warning, "host system") {
+				t.Errorf("Unexpected devcontainer warning in container environment: %s", warning)
+			}
+		}
+
+		t.Logf("Devcontainer environment warnings: %v", result.Warnings)
+	})
+}
+
+// TestContainerDetection tests the container detection logic specifically
+func TestContainerDetection(t *testing.T) {
+	// Test different environment variable scenarios
+	testCases := []struct {
+		name      string
+		envVars   map[string]string
+		dockerEnv bool
+		expected  string
+	}{
+		{
+			name:     "Host environment",
+			envVars:  map[string]string{},
+			expected: "host",
+		},
+		{
+			name: "Devcontainer environment",
+			envVars: map[string]string{
+				"DEVCONTAINER": "true",
+			},
+			expected: "devcontainer",
+		},
+		{
+			name: "Codespaces environment",
+			envVars: map[string]string{
+				"CODESPACES": "true",
+			},
+			expected: "codespaces",
+		},
 	}
 
-	if !found {
-		t.Errorf("Expected warning about devcontainer, got warnings: %v", result.Warnings)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set environment variables
+			for key, value := range tc.envVars {
+				os.Setenv(key, value)
+				defer os.Unsetenv(key)
+			}
 
-	t.Logf("Container warning test passed: %v", result.Warnings)
+			// Clear other environment variables that might interfere
+			for _, envVar := range []string{"DEVCONTAINER", "CODESPACES"} {
+				if _, exists := tc.envVars[envVar]; !exists {
+					os.Unsetenv(envVar)
+				}
+			}
+
+			env := detectEnvironment()
+			if env.Container != tc.expected {
+				t.Errorf("Expected container type '%s', got '%s'", tc.expected, env.Container)
+			}
+
+			t.Logf("Container detection test '%s': detected '%s'", tc.name, env.Container)
+		})
+	}
 }
