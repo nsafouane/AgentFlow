@@ -107,7 +107,12 @@ This implementation plan converts the Foundations & Project Governance design in
   - **Documentation**: Create supply chain security section (extends security baseline doc)
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 9. Initial Risk Register & ADR Template
+- [x] 9. Initial Risk Register & ADR Template
+
+
+
+
+
   - **Implementation**: Create /docs/risk-register.yaml with top ≥8 risks (id, desc, severity, mitigation link) and /docs/adr/ template committed + first ADR (architecture baseline)
   - **Unit Tests**: Implement risk YAML schema lint test and ADR filename pattern test
   - **Manual Testing**: Record review sign-off in PR comments

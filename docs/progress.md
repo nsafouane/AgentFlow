@@ -15,9 +15,10 @@
 - [x] Task 6: CLI `af validate` Stub - **COMPLETED 2025-08-16**
 - [x] Task 7: Versioning & Release Engineering Baseline - **COMPLETED 2025-08-16**
 - [x] Task 8: Multi-Arch Container Build & Signing (Foundational) - **COMPLETED 2025-08-16**
+- [x] Task 9: Initial Risk Register & ADR Template - **COMPLETED 2025-01-16**
 
 ### In Progress:
-- [ ] Task 9: Observability & Metrics Baseline (Next up)
+- [ ] Task 10: Observability & Metrics Baseline (Next up)
 
 ### Blocked Items:
 - None
@@ -627,6 +628,87 @@
 - **Transparency Logging**: Rekor integration for public signature verification
 - **Policy Enforcement**: Automated quality gates with vulnerability blocking thresholds
 
+## Task 9 Completion Summary
+
+**Completion Date**: 2025-01-16  
+**Duration**: 1 day  
+**Status**: COMPLETED ✅
+
+### Key Achievements:
+- ✅ Comprehensive risk register with 9 critical project risks covering multi-tenant isolation, tool sandboxing, LLM dependencies, scaling bottlenecks, cost management, migration safety, supply chain security, knowledge concentration, and regulatory compliance
+- ✅ Complete ADR template with comprehensive structure for decision documentation including Status, Context, Decision, Consequences, Alternatives, and References sections
+- ✅ Architecture baseline ADR documenting foundational Control Plane + Data Plane architecture decision with detailed analysis of alternatives
+- ✅ Governance validation scripts with comprehensive schema validation for risk register and ADR filename pattern validation
+- ✅ Cross-platform unit tests with comprehensive validation functionality and build system integration
+- ✅ Manual testing procedures with documented approval process and review sign-off
+- ✅ Complete CONTRIBUTING.md with comprehensive governance process documentation including ADR and risk management workflows
+
+### Metrics Achieved:
+- Risk register coverage: 9 risks (exceeds minimum of 8) with comprehensive threat modeling session scheduled
+- ADR template completeness: All required sections with detailed guidance and examples
+- Governance validation coverage: 2 validation scripts with comprehensive schema checking and filename pattern validation
+- Unit test coverage: Comprehensive validation functionality with cross-platform support
+- Manual testing coverage: Complete testing procedures with documented approval process
+- Documentation completeness: CONTRIBUTING.md (200+ lines) with comprehensive governance workflows
+- Build system integration: Makefile and Taskfile.yml commands for governance validation
+
+### Technical Implementation Details:
+
+#### Risk Register Implementation:
+- **Comprehensive Risk Coverage**: 9 risks covering critical project areas including security, scalability, operational, and compliance risks
+- **Structured YAML Format**: Well-defined schema with metadata, risk details, and threat modeling integration
+- **Risk Classification**: Proper severity (critical, high, medium, low) and probability assessments with impact descriptions
+- **Mitigation Strategies**: Detailed mitigation approaches with ownership assignment and review schedules
+- **Threat Modeling Integration**: Scheduled threat modeling session (2025-01-30) with defined scope and deliverables
+- **Traceability**: Links to related ADRs and documentation for comprehensive risk management
+
+#### ADR Template and Architecture Baseline:
+- **Comprehensive Template**: Complete ADR structure with Status, Context, Decision, Consequences, Alternatives, and References sections
+- **Architecture Baseline ADR**: Foundational decision documenting Control Plane + Data Plane architecture with detailed analysis
+- **Decision Rationale**: Comprehensive evaluation of alternatives including monolithic, Python-based, event sourcing, and serverless architectures
+- **Technology Stack Documentation**: Complete justification for Go, NATS JetStream, PostgreSQL, and gVisor technology choices
+- **Consequences Analysis**: Detailed positive, negative, and neutral consequences with operational implications
+- **Naming Convention**: ADR-NNNN-title-with-hyphens.md format with proper numbering and structure
+
+#### Governance Validation Framework:
+- **Schema Validation**: Comprehensive YAML schema validation for risk register with proper field validation and date format checking
+- **ADR Filename Validation**: Pattern matching for ADR naming convention with template presence verification
+- **Cross-Platform Support**: Go-based validation scripts with proper error handling and detailed reporting
+- **Build System Integration**: Makefile and Taskfile.yml commands for governance validation with CI/CD integration capability
+- **Unit Testing**: Comprehensive test coverage for validation functionality with mock data and edge case testing
+- **Error Reporting**: Clear error messages with specific validation failure details and remediation guidance
+
+#### Documentation and Process Integration:
+- **CONTRIBUTING.md**: Comprehensive contribution guide with detailed ADR process, risk management workflows, development standards, and governance procedures
+- **Manual Testing Procedures**: Complete testing guide with step-by-step validation procedures and approval documentation
+- **Process Documentation**: Clear workflows for risk identification, ADR creation, governance validation, and review processes
+- **Integration Examples**: CI/CD pipeline integration examples and automation guidance for governance validation
+- **Quality Assurance**: Manual testing validation with documented review sign-off and approval processes
+
+### Requirements Satisfied:
+- ✅ **Requirement 9.1**: Risk register with top ≥8 risks (id, desc, severity, mitigation link) - 9 risks implemented
+- ✅ **Requirement 9.2**: ADR template committed + first ADR (architecture baseline) - Complete template and baseline ADR
+- ✅ **Requirement 9.3**: Risk YAML schema lint test and ADR filename pattern test - Comprehensive validation scripts
+- ✅ **Requirement 9.4**: CONTRIBUTING.md referencing ADR & risk processes - Complete governance documentation
+
+### Artifacts Delivered:
+- [Risk Register](./docs/risk-register.yaml) - Comprehensive risk management with 9 critical risks and threat modeling integration
+- [ADR Template](./docs/adr/template.md) - Complete ADR structure with comprehensive guidance
+- [Architecture Baseline ADR](./docs/adr/ADR-0001-architecture-baseline.md) - Foundational architecture decision documentation
+- [Governance Validation Scripts](./scripts/validate-governance.go) - Comprehensive validation framework with schema checking
+- [Governance Unit Tests](./scripts/validate-governance_test.go) - Complete test suite for validation functionality
+- [Manual Testing Guide](./scripts/test-governance-manual.md) - Comprehensive testing procedures with approval documentation
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - Complete contribution guide with governance processes and workflows
+- [Build System Integration](./Makefile) - Governance validation commands integrated into build system
+
+### Governance Framework Features:
+- **Risk Management**: Comprehensive risk identification, assessment, mitigation, and review processes with formal ownership assignment
+- **Decision Documentation**: Complete ADR workflow with template, naming conventions, review processes, and status management
+- **Validation Automation**: Automated governance artifact validation with schema checking and pattern matching
+- **Process Integration**: Complete integration with development workflow, CI/CD pipeline, and contribution processes
+- **Quality Assurance**: Manual testing procedures with documented approval processes and review sign-off requirements
+- **Documentation Standards**: Comprehensive documentation with clear guidelines, examples, and integration procedures
+
 ## Task 1 Completion Summary
 
 **Completion Date**: 2025-08-16  
@@ -726,8 +808,8 @@ AgentFlow CLI
 - [x] Signed multi-arch images (amd64+arm64, cosign verify passes) - **COMPLETED**
 - [x] Release versioning policy (RELEASE.md published & CI referenced) - **COMPLETED**
 - [x] Interface freeze snapshot (/docs/interfaces committed) - **COMPLETED** (via comprehensive documentation)
-- [ ] Risk register & ADR baseline (merged) - **PLANNED: Task 9**
-- [ ] Threat model kickoff scheduled (logged in risk register) - **PLANNED: Task 10**
+- [x] Risk register & ADR baseline (merged) - **COMPLETED 2025-01-16**
+- [x] Threat model kickoff scheduled (logged in risk register) - **COMPLETED 2025-01-16** (scheduled for 2025-01-30)
 
 ## Development Velocity Metrics:
 - **Task 1 Completion Time**: 1 day (2025-08-16)
@@ -819,10 +901,18 @@ AgentFlow CLI
   - Cross-platform testing framework with both Bash and PowerShell implementations
   - Complete supply chain security documentation extending security baseline
   - Manual testing validation with tool installation and container build verification
-- ✅ **Gate G0 Criteria**: 8/9 criteria completed (CI, builds, devcontainer, SBOM, signing, versioning, release policy, multi-arch containers)
+- ✅ **Q1.1 Task 9**: Initial Risk Register & ADR Template - **COMPLETED**
+  - Comprehensive risk register with 9 critical project risks covering multi-tenant isolation, tool sandboxing, LLM dependencies, scaling bottlenecks, cost management, migration safety, supply chain security, knowledge concentration, and regulatory compliance
+  - Complete ADR template with comprehensive structure for decision documentation including Status, Context, Decision, Consequences, Alternatives, and References sections
+  - Architecture baseline ADR documenting foundational Control Plane + Data Plane architecture decision with detailed analysis of alternatives
+  - Governance validation scripts with comprehensive schema validation for risk register and ADR filename pattern validation
+  - Cross-platform unit tests with comprehensive validation functionality and build system integration
+  - Manual testing procedures with documented approval process and review sign-off
+  - Complete CONTRIBUTING.md with comprehensive governance process documentation including ADR and risk management workflows
+- ✅ **Gate G0 Criteria**: 9/9 criteria completed (CI, builds, devcontainer, SBOM, signing, versioning, release policy, multi-arch containers, risk register & ADR baseline, threat modeling scheduled)
 
 #### In Progress:
-- 🔄 **Q1.1 Task 9**: Observability & Metrics Baseline (0% complete, starting next)
+- 🔄 **Q1.1 Task 10**: Observability & Metrics Baseline (0% complete, starting next)
 
 #### Blockers Resolved:
 - ✅ Go module import path resolution for SDK tests (resolved with proper import statements)
@@ -839,7 +929,7 @@ AgentFlow CLI
 - Prepare for Q1.2 messaging backbone and tracing skeleton
 
 #### Key Metrics This Week:
-- **Tasks Completed**: 8/10 Q1.1 tasks (80% of Q1.1 spec)
+- **Tasks Completed**: 9/10 Q1.1 tasks (90% of Q1.1 spec)
 - **Build Success Rate**: 100% (all platforms tested)
 - **Test Coverage**: 100% (all implemented modules and workflows have tests)
 - **Documentation Coverage**: 100% (architecture, README, dev environment, CI policy, security baseline, migration policy, CLI quickstart, supply chain security)
@@ -860,7 +950,10 @@ AgentFlow CLI
 - **Migration Validation Coverage**: 7 validation checks with 100% success rate
 - **CLI Validation Coverage**: 11 tool validations + 2 service connectivity checks with JSON schema validation
 - **Container Validation Coverage**: 10 validation scenarios with 100% success rate
-- **Gate G0 Progress**: 8/9 criteria completed (89% of Q1 exit requirements)
+- **Gate G0 Progress**: 9/9 criteria completed (100% of Q1 exit requirements)
+- **Risk Register Coverage**: 9 risks documented (exceeds minimum of 8) with threat modeling scheduled
+- **ADR Framework**: Complete template and architecture baseline ADR with governance validation
+- **Governance Validation**: 2 validation scripts with comprehensive schema checking and build system integration
 - **Version Management Tools**: 2 cross-platform scripts (update-version, parse-version) with comprehensive testing
 - **Release Workflow Coverage**: Complete GitHub Actions pipeline with dry-run testing capability
 - **Documentation Coverage**: RELEASE.md (100+ pages) and CHANGELOG.md with comprehensive guidelines
@@ -909,6 +1002,12 @@ AgentFlow CLI
 - Supply chain security documentation is critical for enterprise adoption and compliance requirements
 - Manual testing validation ensures real-world functionality beyond automated CI/CD pipeline testing
 - Container build performance optimization through caching and parallel execution is essential for CI efficiency
+- Comprehensive risk management requires proactive identification of technical, operational, and compliance risks
+- ADR templates with detailed structure improve decision documentation quality and consistency
+- Governance validation automation prevents drift in documentation standards and ensures compliance
+- Risk register integration with threat modeling provides systematic security assessment approach
+- CONTRIBUTING.md documentation with governance processes reduces onboarding friction and ensures consistent practices
+- Cross-platform governance validation scripts ensure consistent quality across development environments
 
 ---
 

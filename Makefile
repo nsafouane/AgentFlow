@@ -62,6 +62,20 @@ security-scan: ## Run security scans
 	@echo "Running security scans..."
 	@echo "Security scanning will be implemented with gosec, osv-scanner, etc."
 
+# Governance validation
+validate-governance: ## Validate risk register and ADR structure
+	@echo "Validating governance artifacts..."
+	go run scripts/validate-governance.go all
+	@echo "Governance validation complete"
+
+validate-risks: ## Validate risk register schema
+	@echo "Validating risk register..."
+	go run scripts/validate-governance.go risk-schema
+
+validate-adrs: ## Validate ADR filename patterns
+	@echo "Validating ADR filenames..."
+	go run scripts/validate-governance.go adr-filenames
+
 # Container builds
 containers: ## Build container images
 	@echo "Building multi-arch containers..."

@@ -80,6 +80,25 @@ tasks:
       - echo "Running security scans..."
       - echo "Security scanning will be implemented with gosec, osv-scanner, etc."
 
+  validate-governance:
+    desc: Validate risk register and ADR structure
+    cmds:
+      - echo "Validating governance artifacts..."
+      - go run scripts/validate-governance.go all
+      - echo "Governance validation complete"
+
+  validate-risks:
+    desc: Validate risk register schema
+    cmds:
+      - echo "Validating risk register..."
+      - go run scripts/validate-governance.go risk-schema
+
+  validate-adrs:
+    desc: Validate ADR filename patterns
+    cmds:
+      - echo "Validating ADR filenames..."
+      - go run scripts/validate-governance.go adr-filenames
+
   containers:
     desc: Build multi-arch container images
     cmds:
