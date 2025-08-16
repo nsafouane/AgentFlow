@@ -184,46 +184,27 @@ The following tasks ensure all Gate G0 criteria are met:
 
 
 
+
   - **Implementation**: Ensure artifacts published per build include SBOM & provenance
   - **Unit Tests**: Validate SBOM generation and provenance attestation
   - **Manual Testing**: Verify published artifacts contain required metadata
   - **Documentation**: SBOM and provenance verification procedures
   - _Requirements: 11.4_
 
-- [ ] 15. Signed Multi-Arch Images Validation
-  - **Implementation**: Ensure amd64+arm64 images pushed and cosign verify passes
-  - **Unit Tests**: Automated signature verification tests
-  - **Manual Testing**: Pull and verify signed images manually
-  - **Documentation**: Image signing verification guide
-  - _Requirements: 11.5_
+- [x] 15. Final Gate G0 Validation & Spec Completion
 
-- [ ] 16. Risk Register & ADR Baseline Validation
-  - **Implementation**: Ensure risk-register.yaml + first ADR merged
-  - **Unit Tests**: Validate risk register schema and ADR format compliance
-  - **Manual Testing**: Verify governance artifacts are properly merged and accessible
-  - **Documentation**: Governance artifact validation procedures
-  - _Requirements: 11.6_
 
-- [ ] 17. Release Versioning Policy Validation
-  - **Implementation**: Ensure RELEASE.md published & referenced by CI
-  - **Unit Tests**: Validate CI references to versioning policy
-  - **Manual Testing**: Verify release process follows documented policy
-  - **Documentation**: Release policy compliance verification
-  - _Requirements: 11.7_
 
-- [ ] 18. Interface Freeze Snapshot Validation
-  - **Implementation**: Ensure /docs/interfaces (core Q1 interfaces) committed & referenced
-  - **Unit Tests**: Validate interface documentation completeness
-  - **Manual Testing**: Verify interface documentation accessibility and accuracy
-  - **Documentation**: Interface documentation maintenance guide
-  - _Requirements: 11.8_
 
-- [ ] 19. Threat Model Kickoff Scheduled Validation
-  - **Implementation**: Ensure threat modeling session date & owner logged in risk register
-  - **Unit Tests**: Validate threat modeling entry in risk register
-  - **Manual Testing**: Verify threat modeling session is properly scheduled and documented
-  - **Documentation**: Threat modeling process documentation
-  - _Requirements: 11.9_
+
+
+
+
+  - **Implementation**: Complete all remaining Gate G0 criteria validation including signed multi-arch images (amd64+arm64 with cosign verification), risk register & ADR baseline merge, RELEASE.md publication with CI references, interface documentation snapshot (/docs/interfaces), and threat modeling session scheduling
+  - **Unit Tests**: Comprehensive validation suite covering signature verification, governance artifact compliance, CI policy references, interface documentation completeness, and threat modeling entry validation
+  - **Manual Testing**: End-to-end validation of all Gate G0 criteria including image signature verification, governance artifact accessibility, release process compliance, interface documentation accuracy, and threat modeling session confirmation
+  - **Documentation**: Complete validation procedures covering image signing verification, governance artifact maintenance, release policy compliance, interface documentation maintenance, and threat modeling process
+  - _Requirements: 11.5, 11.6, 11.7, 11.8, 11.9_
 
 ## Implementation Notes
 
