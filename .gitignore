@@ -1,0 +1,242 @@
+# AgentFlow .gitignore
+# Comprehensive ignore patterns for Go project with security tools and multi-platform builds
+
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go build artifacts
+/bin/
+/dist/
+/build/
+*.o
+*.a
+*.so
+
+# Go test artifacts
+*.test
+*.prof
+coverage.txt
+coverage.out
+coverage.html
+
+# Go module cache
+go.sum.backup
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment and configuration files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.local
+
+# Security tools and binaries
+cosign
+cosign.exe
+syft
+syft.exe
+grype
+grype.exe
+gitleaks
+gitleaks.exe
+gosec
+gosec.exe
+trivy
+trivy.exe
+jq
+jq.exe
+
+# Security tool outputs
+*.sarif
+*.json.tmp
+security-report.*
+vulnerability-report.*
+sbom.*
+*.spdx.json
+*.cyclonedx.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+log/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+
+# Node.js (for dashboard and JavaScript SDK)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Python (for Python SDK)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Archives and compressed files
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Generated documentation
+docs/generated/
+*.html.tmp
+
+# Test artifacts
+testdata/output/
+test-results/
+test-reports/
+
+# Performance profiling
+*.pprof
+*.trace
+
+# Release artifacts (keep in CI, not in repo)
+release/
+artifacts/
+
+# Local development overrides
+docker-compose.local.yml
+local.yaml
+local.yml
+.local/
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Git LFS (if we decide to use it later)
+*.lfs
+
+# Ignore specific large files that were accidentally committed
+af-sbom.spdx.json
+
+# Development tools cache
+.cache/
+.tool-versions
+
+# Pre-commit
+.pre-commit-cache/
+
+# GoReleaser
+dist/
+goreleaser.yaml.tmp
+
+# Air (Go live reload)
+.air.toml
+tmp/
+
+# Delve debugger
+__debug_bin
+
+# Go workspace
+go.work
+go.work.sum
