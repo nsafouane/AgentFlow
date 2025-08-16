@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: Release
 
 on:
   push:
@@ -6,129 +6,392 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release'
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
         required: true
         type: string
+      dry_run:
+        description: 'Perform a dry run (no actual release)'
+        required: false
+        type: boolean
+        default: false
 
 env:
-  GO_VERSION: '1.22'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 permissions:
   contents: write
-  security-events: write
-  id-token: write
   packages: write
+  id-token: write
   attestations: write
 
 jobs:
-  # Release Build Job
-  release-build:
-    name: Release Build
+  validate-version:
     runs-on: ubuntu-latest
-    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+              echo "Error: Invalid version format: $VERSION"
+              exit 1
+            fi
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is a pre-release
+          if [[ $VERSION =~ -[a-zA-Z0-9.-]+ ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Release version: $VERSION"
+          echo "Is pre-release: $([ "$VERSION" != "${VERSION%-*}" ] && echo "true" || echo "false")"
 
-    - name: Install GoReleaser
-      uses: goreleaser/goreleaser-action@v5
-      with:
-        distribution: goreleaser
-        version: latest
-        install-only: true
+      - name: Validate version sequence
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_VERSION=${LATEST_TAG#v}
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          
+          echo "Latest version: $LATEST_VERSION"
+          echo "New version: $NEW_VERSION"
+          
+          # Use version parsing script to validate sequence
+          chmod +x scripts/parse-version.sh
+          if ! scripts/parse-version.sh "$LATEST_VERSION" validate "$NEW_VERSION" | grep -q "SEQUENCE_VALID=true"; then
+            echo "Warning: Version sequence validation failed"
+            echo "This may be intentional for hotfixes or corrections"
+          fi
 
-    - name: Run GoReleaser
-      run: goreleaser release --clean
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Generate SBOM for release
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-        syft packages . -o spdx-json=release-sbom.spdx.json
-        syft packages . -o cyclonedx-json=release-sbom.cyclonedx.json
-
-    - name: Upload release SBOM
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-sbom-${{ github.ref_name }}
-        path: |
-          release-sbom.spdx.json
-          release-sbom.cyclonedx.json
-
-  # Release Container Build
-  release-container:
-    name: Release Container Build
+  build-and-test:
     runs-on: ubuntu-latest
-    needs: [release-build]
-    
+    needs: validate-version
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os == 'windows-latest' && 'windows' || 'linux' }}
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.validate-version.outputs.version }}
+        run: |
+          # Update version in code
+          scripts/update-version.sh "$VERSION" || scripts/update-version.ps1 -NewVersion "$VERSION"
+          
+          # Build binary
+          mkdir -p dist
+          BINARY_NAME="af"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="af.exe"
+          fi
+          
+          go build -ldflags="-X main.Version=$VERSION -X main.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.GitCommit=$GITHUB_SHA" \
+            -o "dist/${BINARY_NAME}-${GOOS}-${GOARCH}" \
+            ./cmd/af
 
-    - name: Build and push release images
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        provenance: true
-        sbom: true
+      - name: Run tests
+        run: |
+          go test -v ./...
+          
+          # Run version management tests
+          chmod +x scripts/test-version.sh
+          scripts/test-version.sh
 
-    - name: Install Cosign
-      uses: sigstore/cosign-installer@v3
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
 
-    - name: Sign release images
-      run: |
-        echo "${{ steps.meta.outputs.tags }}" | while read tag; do
-          cosign sign --yes "${tag}@${{ steps.build.outputs.digest }}"
-        done
+  build-containers:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-and-test]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-uri: ${{ steps.build.outputs.image-uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Generate release attestation
-      uses: actions/attest-build-provenance@v1
-      with:
-        subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        subject-digest: ${{ steps.build.outputs.digest }}
-        push-to-registry: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Verify signatures
-      run: |
-        echo "${{ steps.meta.outputs.tags }}" | while read tag; do
-          cosign verify "${tag}@${{ steps.build.outputs.digest }}" --certificate-identity-regexp=".*" --certificate-oidc-issuer-regexp=".*"
-        done
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=v${{ needs.validate-version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.validate-version.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ needs.validate-version.outputs.version }},enable=${{ !needs.validate-version.outputs.is_prerelease }}
+
+      - name: Build and push container image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event.inputs.dry_run != 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate-version.outputs.version }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            GIT_COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
+
+  sign-artifacts:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-containers]
+    if: github.event.inputs.dry_run != 'true'
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign container image
+        run: |
+          cosign sign --yes ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }}
+
+      - name: Verify signature
+        run: |
+          cosign verify \
+            --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }}
+
+  generate-sbom:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-containers]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM for source
+        run: |
+          syft . -o spdx-json=sbom-source.spdx.json
+          syft . -o cyclonedx-json=sbom-source.cyclonedx.json
+
+      - name: Generate SBOM for container
+        if: needs.build-containers.outputs.image-uri
+        run: |
+          syft ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }} \
+            -o spdx-json=sbom-container.spdx.json
+          syft ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }} \
+            -o cyclonedx-json=sbom-container.cyclonedx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ needs.validate-version.outputs.version }}
+          path: |
+            sbom-*.spdx.json
+            sbom-*.cyclonedx.json
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-containers]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Grype vulnerability scanner
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          grype ${{ needs.build-containers.outputs.image-uri }}@${{ needs.build-containers.outputs.image-digest }} \
+            -o json --file grype-results.json
+          
+          # Check for high/critical vulnerabilities
+          HIGH_CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")] | length' grype-results.json)
+          if [ "$HIGH_CRITICAL" -gt 0 ]; then
+            echo "Found $HIGH_CRITICAL high/critical vulnerabilities"
+            jq '.matches[] | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")' grype-results.json
+            exit 1
+          fi
+
+      - name: Upload vulnerability scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-scan-${{ needs.validate-version.outputs.version }}
+          path: |
+            trivy-results.sarif
+            grype-results.json
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-and-test, build-containers, sign-artifacts, generate-sbom, security-scan]
+    if: always() && !failure() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          # Extract changelog section for this version
+          if grep -q "## \[$VERSION\]" CHANGELOG.md; then
+            sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -1 > release-notes.md
+          else
+            echo "## Release $VERSION" > release-notes.md
+            echo "" >> release-notes.md
+            echo "This release includes the latest changes from the development branch." >> release-notes.md
+          fi
+          
+          # Add artifact information
+          echo "" >> release-notes.md
+          echo "## Artifacts" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Container Images" >> release-notes.md
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION\`" >> release-notes.md
+          echo "- Multi-architecture support: linux/amd64, linux/arm64" >> release-notes.md
+          echo "- Signed with Cosign keyless signing" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Verification" >> release-notes.md
+          echo "\`\`\`bash" >> release-notes.md
+          echo "# Verify container signature" >> release-notes.md
+          echo "cosign verify \\" >> release-notes.md
+          echo "  --certificate-identity-regexp=\"https://github.com/${{ github.repository }}\" \\" >> release-notes.md
+          echo "  --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\" >> release-notes.md
+          echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION" >> release-notes.md
+          echo "\`\`\`" >> release-notes.md
+
+      - name: Create GitHub Release
+        if: github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate-version.outputs.version }}
+          name: AgentFlow v${{ needs.validate-version.outputs.version }}
+          body_path: release-notes.md
+          prerelease: ${{ needs.validate-version.outputs.is_prerelease }}
+          files: |
+            release-artifacts/binaries-*/*
+            release-artifacts/sbom-*/*
+            release-artifacts/vulnerability-scan-*/*
+          generate_release_notes: true
+
+      - name: Update latest tag
+        if: github.event.inputs.dry_run != 'true' && needs.validate-version.outputs.is_prerelease == 'false'
+        run: |
+          git tag -f latest
+          git push origin latest --force
+
+  dry-run-summary:
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-and-test, build-containers, generate-sbom, security-scan]
+    if: github.event.inputs.dry_run == 'true'
+    steps:
+      - name: Dry run summary
+        run: |
+          echo "## 🚀 Dry Run Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.validate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pre-release:** ${{ needs.validate-version.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Completed Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- [x] Version validation" >> $GITHUB_STEP_SUMMARY
+          echo "- [x] Cross-platform builds" >> $GITHUB_STEP_SUMMARY
+          echo "- [x] Container image build" >> $GITHUB_STEP_SUMMARY
+          echo "- [x] SBOM generation" >> $GITHUB_STEP_SUMMARY
+          echo "- [x] Security scanning" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚫 Skipped Steps (Dry Run)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Container image push" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Artifact signing" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] GitHub release creation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Ready for production release!** 🎉" >> $GITHUB_STEP_SUMMARY
+
+  notify-completion:
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-release]
+    if: always() && !failure() && !cancelled() && github.event.inputs.dry_run != 'true'
+    steps:
+      - name: Release notification
+        run: |
+          echo "## 🎉 Release Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**AgentFlow v${{ needs.validate-version.outputs.version }}** has been successfully released!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Release Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub Release: [v${{ needs.validate-version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- Container Image: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Signed with Cosign keyless signing ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- SBOM and provenance included ✅" >> $GITHUB_STEP_SUMMARY
