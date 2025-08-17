@@ -5,25 +5,17 @@ import "context"
 
 // MessageBus provides messaging interface for AgentFlow
 type MessageBus interface {
-	Publish(ctx context.Context, subject string, data []byte) error
+	Publish(ctx context.Context, subject string, msg *Message) error
 	Subscribe(ctx context.Context, subject string, handler MessageHandler) error
 	Close() error
 }
 
 // MessageHandler handles incoming messages
-type MessageHandler func(msg Message) error
-
-// Message represents a message in the system
-type Message struct {
-	Subject   string
-	Data      []byte
-	Headers   map[string]string
-	Timestamp int64
-}
+type MessageHandler func(msg *Message) error
 
 // Publisher provides message publishing interface
 type Publisher interface {
-	Publish(ctx context.Context, subject string, data []byte) error
+	Publish(ctx context.Context, subject string, msg *Message) error
 }
 
 // Subscriber provides message subscription interface

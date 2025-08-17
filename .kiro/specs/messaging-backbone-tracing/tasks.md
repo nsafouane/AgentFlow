@@ -2,7 +2,17 @@
 
 This implementation plan converts the messaging backbone design into a series of prompts for code-generation that will implement each step in a test-driven manner. Each task builds incrementally on previous tasks and focuses on discrete, manageable coding steps that can be executed by a coding agent.
 
-- [ ] 1. Subject Taxonomy & Message Contract v1
+- [x] 1. Subject Taxonomy & Message Contract v1
+
+
+
+
+
+
+
+
+
+
   - Define constants for NATS subjects (workflows.*, agents.*, tools.*, system.*)
   - Create Go structs for Message with all required fields (ID, TraceID, SpanID, From, To, Type, Payload, Metadata, Cost, Timestamp, EnvelopeHash)
   - Implement JSON schema definitions for message validation with proper error handling
