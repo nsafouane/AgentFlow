@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"math"
 	"math/rand"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -27,6 +27,7 @@ type natsBus struct {
 	js         nats.JetStreamContext
 	config     *BusConfig
 	serializer *CanonicalSerializer
+	tracing    *TracingMiddleware
 }
 
 // NewNATSBus creates a new NATS JetStream message bus
@@ -60,11 +61,19 @@ func NewNATSBus(config *BusConfig) (MessageBus, error) {
 		return nil, fmt.Errorf("failed to create serializer: %w", err)
 	}
 
+	// Initialize tracing middleware
+	tracing, err := NewTracingMiddleware(DefaultTracingConfig())
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to create tracing middleware: %w", err)
+	}
+
 	bus := &natsBus{
 		conn:       conn,
 		js:         js,
 		config:     config,
 		serializer: serializer,
+		tracing:    tracing,
 	}
 
 	// Initialize streams
@@ -183,15 +192,24 @@ func (nb *natsBus) initializeStreams() error {
 
 // Publish publishes a message to the specified subject
 func (nb *natsBus) Publish(ctx context.Context, subject string, msg *Message) error {
+	// Start publish span
+	ctx, span := nb.tracing.StartPublishSpan(ctx, subject, msg)
+	defer span.End()
+
+	// Inject trace context into message
+	nb.tracing.InjectTraceContext(ctx, msg)
+
 	// Serialize the message
 	data, err := nb.serializer.Serialize(msg)
 	if err != nil {
+		span.RecordError(err)
 		return fmt.Errorf("failed to serialize message: %w", err)
 	}
 
 	// Publish with context
 	_, err = nb.js.PublishAsync(subject, data)
 	if err != nil {
+		span.RecordError(err)
 		return fmt.Errorf("failed to publish message to subject %s: %w", subject, err)
 	}
 
@@ -281,12 +299,20 @@ func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, 
 					continue
 				}
 
+				// Extract trace context and start consume span
+				traceCtx := nb.tracing.ExtractTraceContext(&msg)
+				traceCtx, span := nb.tracing.StartConsumeSpan(traceCtx, subscription.Subject, &msg)
+
 				// Handle the message
-				if err := handler(ctx, &msg); err != nil {
+				if err := handler(traceCtx, &msg); err != nil {
+					span.RecordError(err)
+					span.End()
 					messagingLogf("Message handler error: %v", err)
 					natsMsg.Nak()
 					continue
 				}
+
+				span.End()
 
 				// Acknowledge successful processing
 				natsMsg.Ack()
@@ -297,6 +323,9 @@ func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, 
 
 // Replay retrieves messages for a workflow in chronological order
 func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time) ([]Message, error) {
+	// Start replay span
+	ctx, span := nb.tracing.StartReplaySpan(ctx, workflowID)
+	defer span.End()
 	// Build subject pattern for the workflow
 	subjectPattern := fmt.Sprintf("workflows.%s.*", workflowID)
 
@@ -314,6 +343,7 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 	// Create temporary consumer
 	_, err := nb.js.AddConsumer(StreamAFMessages, consumerConfig)
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("failed to create replay consumer: %w", err)
 	}
 
@@ -325,6 +355,7 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 	// Create subscription for replay
 	sub, err := nb.js.PullSubscribe(subjectPattern, consumerName)
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("failed to create replay subscription: %w", err)
 	}
 	defer sub.Unsubscribe()
@@ -338,6 +369,7 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 			if err == nats.ErrTimeout {
 				break // No more messages
 			}
+			span.RecordError(err)
 			return nil, fmt.Errorf("failed to fetch replay messages: %w", err)
 		}
 

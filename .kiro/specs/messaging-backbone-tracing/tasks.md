@@ -39,7 +39,12 @@ This implementation plan converts the messaging backbone design into a series of
   - Document environment variables (AF_BUS_URL) and retry guidelines in /docs/messaging.md
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 3. OpenTelemetry Context Propagation
+- [x] 3. OpenTelemetry Context Propagation
+
+
+
+
+
   - Set up OpenTelemetry tracer with Jaeger exporter configuration
   - Implement trace context injection that adds trace parent information to outgoing message headers
   - Build trace context extraction that continues distributed traces from incoming message headers  

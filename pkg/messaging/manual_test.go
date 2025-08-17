@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // TestManualSampleMessages creates and inspects sample messages for manual verification
@@ -427,4 +429,300 @@ func ManualTestNATSLatency() {
 	fmt.Printf("Messages exceeding %v: %d (%.1f%%)\n", target, slowMessages, float64(slowMessages)*100/float64(len(latencies)))
 
 	fmt.Println("\n=== Manual NATS Latency Test Complete ===")
+}
+
+// TestManualTracingJaeger creates traces and provides instructions for Jaeger UI verification
+// Run with: go test -v -run TestManualTracingJaeger
+// Note: Requires Jaeger running locally. Start with:
+// docker run -d --name jaeger -p 16686:16686 -p 14268:14268 jaegertracing/all-in-one:latest
+func TestManualTracingJaeger(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping manual tracing test in short mode")
+	}
+
+	ManualTestTracingJaeger()
+}
+
+// ManualTestTracingJaeger creates traces and provides instructions for Jaeger UI verification
+func ManualTestTracingJaeger() {
+	fmt.Println("=== Manual Test: Tracing with Jaeger ===")
+
+	// Create tracing middleware with real OTLP exporter
+	config := &TracingConfig{
+		Enabled:      true,
+		OTLPEndpoint: "http://localhost:4318",
+		ServiceName:  "agentflow-messaging-manual-test",
+		SampleRate:   1.0,
+	}
+
+	fmt.Printf("Creating tracing middleware with endpoint: %s\n", config.OTLPEndpoint)
+
+	tracing, err := NewTracingMiddleware(config)
+	if err != nil {
+		fmt.Printf("Failed to create tracing middleware: %v\n", err)
+		fmt.Println("Please ensure Jaeger is running with OTLP support:")
+		fmt.Println("docker run -d --name jaeger \\")
+		fmt.Println("  -p 16686:16686 \\")
+		fmt.Println("  -p 14268:14268 \\")
+		fmt.Println("  -p 4317:4317 \\")
+		fmt.Println("  -p 4318:4318 \\")
+		fmt.Println("  jaegertracing/all-in-one:latest")
+		return
+	}
+
+	// Try to connect to NATS server
+	busConfig := &BusConfig{
+		URL:            "nats://localhost:4222",
+		MaxReconnect:   3,
+		ReconnectWait:  1 * time.Second,
+		AckWait:        10 * time.Second,
+		MaxInFlight:    100,
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 5 * time.Second,
+	}
+
+	fmt.Printf("Connecting to NATS server at %s...\n", busConfig.URL)
+
+	bus, err := NewNATSBus(busConfig)
+	if err != nil {
+		fmt.Printf("Could not connect to local NATS server: %v\n", err)
+		fmt.Println("Please start a local NATS server with: nats-server -js")
+		return
+	}
+	defer bus.Close()
+
+	fmt.Println("Connected to NATS successfully!")
+
+	// Create a complex workflow scenario with multiple message hops
+	ctx := context.Background()
+
+	// Start root span for the workflow
+	rootCtx, rootSpan := tracing.tracer.Start(ctx, "customer-support-workflow")
+	rootTraceID := rootSpan.SpanContext().TraceID().String()
+
+	fmt.Printf("Started workflow trace: %s\n", rootTraceID)
+
+	// Step 1: Customer query arrives
+	fmt.Println("\n1. Customer query processing...")
+	customerMsg := NewMessage("msg-001", "customer-portal", "query-classifier", MessageTypeRequest)
+	customerMsg.SetPayload(map[string]interface{}{
+		"query":       "How do I reset my password?",
+		"customer_id": "cust-12345",
+		"urgency":     "normal",
+	})
+	customerMsg.AddMetadata("workflow_id", "support-wf-789")
+	customerMsg.AddMetadata("step", "initial-query")
+	customerMsg.SetCost(25, 0.0025)
+
+	publishCtx1, publishSpan1 := tracing.StartPublishSpan(rootCtx, "agents.query-classifier.in", customerMsg)
+	tracing.InjectTraceContext(publishCtx1, customerMsg)
+	err = bus.Publish(publishCtx1, "agents.query-classifier.in", customerMsg)
+	if err != nil {
+		fmt.Printf("Failed to publish customer message: %v\n", err)
+		return
+	}
+	publishSpan1.End()
+
+	// Step 2: Query classification
+	fmt.Println("2. Query classification...")
+	time.Sleep(50 * time.Millisecond) // Simulate processing time
+
+	classificationMsg := NewMessage("msg-002", "query-classifier", "knowledge-base", MessageTypeRequest)
+	classificationMsg.SetPayload(map[string]interface{}{
+		"classification": "password-reset",
+		"confidence":     0.95,
+		"intent":         "account-access",
+	})
+	classificationMsg.AddMetadata("workflow_id", "support-wf-789")
+	classificationMsg.AddMetadata("step", "classification")
+	classificationMsg.AddMetadata("parent_message_id", customerMsg.ID)
+	classificationMsg.SetCost(50, 0.005)
+
+	// Extract context from customer message and continue trace
+	extractedCtx1 := tracing.ExtractTraceContext(customerMsg)
+	consumeCtx1, consumeSpan1 := tracing.StartConsumeSpan(extractedCtx1, "agents.query-classifier.in", customerMsg)
+
+	publishCtx2, publishSpan2 := tracing.StartPublishSpan(consumeCtx1, "agents.knowledge-base.in", classificationMsg)
+	tracing.InjectTraceContext(publishCtx2, classificationMsg)
+	err = bus.Publish(publishCtx2, "agents.knowledge-base.in", classificationMsg)
+	if err != nil {
+		fmt.Printf("Failed to publish classification message: %v\n", err)
+		return
+	}
+	publishSpan2.End()
+	consumeSpan1.End()
+
+	// Step 3: Knowledge base lookup
+	fmt.Println("3. Knowledge base lookup...")
+	time.Sleep(100 * time.Millisecond) // Simulate processing time
+
+	kbMsg := NewMessage("msg-003", "knowledge-base", "response-generator", MessageTypeResponse)
+	kbMsg.SetPayload(map[string]interface{}{
+		"articles": []map[string]interface{}{
+			{
+				"id":    "kb-001",
+				"title": "How to Reset Your Password",
+				"url":   "https://help.example.com/password-reset",
+				"score": 0.92,
+			},
+			{
+				"id":    "kb-002",
+				"title": "Account Security Best Practices",
+				"url":   "https://help.example.com/security",
+				"score": 0.78,
+			},
+		},
+		"total_results": 2,
+	})
+	kbMsg.AddMetadata("workflow_id", "support-wf-789")
+	kbMsg.AddMetadata("step", "knowledge-lookup")
+	kbMsg.AddMetadata("parent_message_id", classificationMsg.ID)
+	kbMsg.SetCost(75, 0.0075)
+
+	// Continue trace from classification message
+	extractedCtx2 := tracing.ExtractTraceContext(classificationMsg)
+	consumeCtx2, consumeSpan2 := tracing.StartConsumeSpan(extractedCtx2, "agents.knowledge-base.in", classificationMsg)
+
+	publishCtx3, publishSpan3 := tracing.StartPublishSpan(consumeCtx2, "agents.response-generator.in", kbMsg)
+	tracing.InjectTraceContext(publishCtx3, kbMsg)
+	err = bus.Publish(publishCtx3, "agents.response-generator.in", kbMsg)
+	if err != nil {
+		fmt.Printf("Failed to publish KB message: %v\n", err)
+		return
+	}
+	publishSpan3.End()
+	consumeSpan2.End()
+
+	// Step 4: Response generation
+	fmt.Println("4. Response generation...")
+	time.Sleep(150 * time.Millisecond) // Simulate processing time
+
+	responseMsg := NewMessage("msg-004", "response-generator", "customer-portal", MessageTypeResponse)
+	responseMsg.SetPayload(map[string]interface{}{
+		"response":   "To reset your password, please visit https://help.example.com/password-reset and follow the instructions. You'll need access to your registered email address.",
+		"confidence": 0.88,
+		"sources":    []string{"kb-001", "kb-002"},
+		"followup_suggestions": []string{
+			"Need help with two-factor authentication?",
+			"Want to update your security settings?",
+		},
+	})
+	responseMsg.AddMetadata("workflow_id", "support-wf-789")
+	responseMsg.AddMetadata("step", "response-generation")
+	responseMsg.AddMetadata("parent_message_id", kbMsg.ID)
+	responseMsg.AddMetadata("original_query_id", customerMsg.ID)
+	responseMsg.SetCost(100, 0.01)
+
+	// Continue trace from KB message
+	extractedCtx3 := tracing.ExtractTraceContext(kbMsg)
+	consumeCtx3, consumeSpan3 := tracing.StartConsumeSpan(extractedCtx3, "agents.response-generator.in", kbMsg)
+
+	publishCtx4, publishSpan4 := tracing.StartPublishSpan(consumeCtx3, "agents.customer-portal.out", responseMsg)
+	tracing.InjectTraceContext(publishCtx4, responseMsg)
+	err = bus.Publish(publishCtx4, "agents.customer-portal.out", responseMsg)
+	if err != nil {
+		fmt.Printf("Failed to publish response message: %v\n", err)
+		return
+	}
+	publishSpan4.End()
+	consumeSpan3.End()
+
+	// Step 5: Final delivery confirmation
+	fmt.Println("5. Final delivery...")
+	time.Sleep(25 * time.Millisecond) // Simulate processing time
+
+	// Continue trace from response message
+	extractedCtx4 := tracing.ExtractTraceContext(responseMsg)
+	_, finalSpan := tracing.StartConsumeSpan(extractedCtx4, "agents.customer-portal.out", responseMsg)
+
+	// Add some final span attributes
+	finalSpan.SetAttributes(
+		attribute.String("workflow.status", "completed"),
+		attribute.String("workflow.outcome", "success"),
+		attribute.Int("workflow.total_messages", 4),
+		attribute.Float64("workflow.total_cost", 0.0225),
+	)
+
+	finalSpan.End()
+
+	// End root span
+	rootSpan.SetAttributes(
+		attribute.String("workflow.type", "customer-support"),
+		attribute.String("workflow.id", "support-wf-789"),
+		attribute.String("customer.id", "cust-12345"),
+		attribute.String("query.classification", "password-reset"),
+		attribute.Float64("workflow.confidence", 0.88),
+	)
+	rootSpan.End()
+
+	fmt.Printf("\nWorkflow completed! Trace ID: %s\n", rootTraceID)
+
+	// Test message replay with tracing
+	fmt.Println("\n6. Testing message replay with tracing...")
+	replayCtx, replaySpan := tracing.StartReplaySpan(ctx, "support-wf-789")
+
+	// Simulate replay from 1 minute ago
+	replayFrom := time.Now().Add(-1 * time.Minute)
+	messages, err := bus.Replay(replayCtx, "support-wf-789", replayFrom)
+	if err != nil {
+		fmt.Printf("Replay failed: %v\n", err)
+	} else {
+		fmt.Printf("Replayed %d messages\n", len(messages))
+		replaySpan.SetAttributes(
+			attribute.Int("replay.message_count", len(messages)),
+			attribute.String("replay.status", "success"),
+		)
+	}
+	replaySpan.End()
+
+	// Give traces time to be exported
+	fmt.Println("\nWaiting for traces to be exported...")
+	time.Sleep(2 * time.Second)
+
+	// Print verification instructions
+	fmt.Println("\n=== Verification Instructions ===")
+	fmt.Printf("1. Open Jaeger UI: http://localhost:16686\n")
+	fmt.Printf("2. Select service: %s\n", config.ServiceName)
+	fmt.Printf("3. Search for trace ID: %s\n", rootTraceID)
+	fmt.Println("4. Verify the following spans are present:")
+	fmt.Println("   - customer-support-workflow (root span)")
+	fmt.Println("   - messaging.publish agents.query-classifier.in")
+	fmt.Println("   - messaging.consume agents.query-classifier.in")
+	fmt.Println("   - messaging.publish agents.knowledge-base.in")
+	fmt.Println("   - messaging.consume agents.knowledge-base.in")
+	fmt.Println("   - messaging.publish agents.response-generator.in")
+	fmt.Println("   - messaging.consume agents.response-generator.in")
+	fmt.Println("   - messaging.publish agents.customer-portal.out")
+	fmt.Println("   - messaging.consume agents.customer-portal.out")
+	fmt.Println("   - messaging.replay support-wf-789")
+	fmt.Println("5. Verify all spans have the same trace ID")
+	fmt.Println("6. Check span attributes for message details:")
+	fmt.Println("   - messaging.message.id")
+	fmt.Println("   - messaging.message.type")
+	fmt.Println("   - messaging.destination.name")
+	fmt.Println("   - agentflow.workflow.id")
+	fmt.Println("   - agentflow.message.cost.tokens")
+	fmt.Println("   - agentflow.message.cost.dollars")
+	fmt.Println("7. Verify span timing shows realistic message processing latencies")
+
+	fmt.Println("\n=== Expected Trace Structure ===")
+	fmt.Println("customer-support-workflow")
+	fmt.Println("├── messaging.publish agents.query-classifier.in")
+	fmt.Println("├── messaging.consume agents.query-classifier.in")
+	fmt.Println("│   └── messaging.publish agents.knowledge-base.in")
+	fmt.Println("├── messaging.consume agents.knowledge-base.in")
+	fmt.Println("│   └── messaging.publish agents.response-generator.in")
+	fmt.Println("├── messaging.consume agents.response-generator.in")
+	fmt.Println("│   └── messaging.publish agents.customer-portal.out")
+	fmt.Println("├── messaging.consume agents.customer-portal.out")
+	fmt.Println("└── messaging.replay support-wf-789")
+
+	fmt.Printf("\nTrace attributes to verify:\n")
+	fmt.Printf("- All spans should have trace_id: %s\n", rootTraceID)
+	fmt.Printf("- Message IDs: msg-001, msg-002, msg-003, msg-004\n")
+	fmt.Printf("- Workflow ID: support-wf-789\n")
+	fmt.Printf("- Total cost: $0.0225 (225 tokens)\n")
+
+	fmt.Println("\n=== Manual Tracing Test Complete ===")
+	fmt.Println("Please verify the traces in Jaeger UI as described above.")
 }

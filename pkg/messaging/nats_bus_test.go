@@ -60,6 +60,9 @@ func (tnc *TestNATSContainer) Stop(ctx context.Context) error {
 }
 
 func TestNATSBus_NewNATSBus(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container
@@ -95,6 +98,9 @@ func TestNATSBus_NewNATSBus(t *testing.T) {
 }
 
 func TestNATSBus_PublishSubscribe(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container
@@ -161,6 +167,9 @@ func TestNATSBus_PublishSubscribe(t *testing.T) {
 }
 
 func TestNATSBus_MessageOrdering(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container
@@ -244,6 +253,9 @@ func TestNATSBus_MessageOrdering(t *testing.T) {
 }
 
 func TestNATSBus_Replay(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container
@@ -307,6 +319,9 @@ func TestNATSBus_Replay(t *testing.T) {
 }
 
 func TestNATSBus_ConnectionRetry(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	// Test connection retry with invalid URL
 	config := &BusConfig{
 		URL:            "nats://invalid-host:4222",
@@ -333,6 +348,9 @@ func TestNATSBus_ConnectionRetry(t *testing.T) {
 }
 
 func TestNATSBus_StreamConfiguration(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container
@@ -382,6 +400,9 @@ func TestNATSBus_StreamConfiguration(t *testing.T) {
 }
 
 func TestNATSBus_MessageValidation(t *testing.T) {
+	// Disable tracing for this test to avoid OTLP export errors
+	t.Setenv("AF_TRACING_ENABLED", "false")
+	
 	ctx := context.Background()
 
 	// Start NATS container

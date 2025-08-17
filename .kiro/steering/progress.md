@@ -14,6 +14,7 @@
 - [ ] **Q1.2 - Messaging Backbone & Tracing Skeleton** - 🔄 **NEXT**
   - Task 1 (Subject Taxonomy & Message Contract v1): ✅ COMPLETED (2025-08-17) - unit tests passing (10/10), coverage 71.9%
   - Task 2 (NATS JetStream Integration): ✅ COMPLETED (2025-08-17) - streams, durable consumers, replay, retry policies, unit tests
+  - Task 3 (OpenTelemetry Context Propagation): ✅ COMPLETED (2025-08-17) - OTLP exporter, context injection/extraction, spans for publish/consume/replay, unit tests, manual Jaeger test, docs
 - [ ] **Q1.3 - Relational Storage & Migrations** - ⏳ **PLANNED**
 - [ ] **Q1.4 - Control Plane API Skeleton** - ⏳ **PLANNED**
 - [ ] **Q1.5 - Orchestrator & Deterministic Planners** - ⏳ **PLANNED**
@@ -54,8 +55,8 @@
 - None
 
 ## Next Actions
-1. **Immediate**: Begin Q1.2 Messaging Backbone & Tracing Skeleton
-2. **This Week**: Create Q1.2 spec requirements and design
+1. **Immediate**: Continue Q1.2 work (observability, logging baseline)
+2. **This Week**: Finalize Q1.2 spec requirements and plan Structured Logging (Task 4)
 3. **Dependencies**: Q1.1 foundation complete (✅ done)
 
 ## Progress Tracking Rules

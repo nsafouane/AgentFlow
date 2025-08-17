@@ -133,6 +133,17 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 - [x] Task 1: Subject Taxonomy & Message Contract v1 - ✅ COMPLETED 2025-08-17
 - [x] Task 2: NATS JetStream Integration - ✅ COMPLETED 2025-08-17
 
+- [x] Task 3: OpenTelemetry Context Propagation - ✅ COMPLETED 2025-08-17
+
+### Q1.2 Key Achievement (Task 3)
+
+- Implemented OpenTelemetry tracer with OTLP HTTP exporter and Jaeger-compatible configuration
+- Automatic trace context injection into outgoing messages (headers and message fields) and extraction from incoming messages
+- Created span creation and linking for message bus operations (messaging.publish <subject>, messaging.consume <subject>, messaging.replay <workflow_id>) with semantic attributes
+- Added unit tests verifying context propagation, span creation, and trace continuity across message hops; tests passing
+- Added manual test `TestManualTracingJaeger` with instructions to verify traces in Jaeger UI
+- Documentation updated in `/docs/messaging.md` with conventions, config, and troubleshooting
+
 ### Q1.2 Key Achievements (Task 2)
 
 - Implemented NATS JetStream client with connection management and configurable AF_BUS_URL

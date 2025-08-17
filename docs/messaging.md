@@ -248,29 +248,186 @@ The NATS client implements exponential backoff with jitter:
 - Maximum retry attempts: 3-5 depending on message type
 - Implement circuit breakers for failing consumers
 
-## Trace Attribute Conventions
+## OpenTelemetry Tracing Integration
 
-### Standard Attributes
+### Trace Context Propagation
 
-When creating spans for message operations, use these attribute keys:
+AgentFlow automatically propagates OpenTelemetry trace context across message boundaries:
 
-- `agentflow.message.id`: Message ID
-- `agentflow.message.type`: Message type
-- `agentflow.message.from`: Source agent
-- `agentflow.message.to`: Target agent
-- `agentflow.message.subject`: NATS subject
-- `agentflow.message.size`: Message size in bytes
-- `agentflow.workflow.id`: Workflow ID (from metadata)
+1. **Injection**: Outgoing messages receive trace context in headers and message fields
+2. **Extraction**: Incoming messages continue the distributed trace
+3. **Span Creation**: All message operations create appropriate spans
+4. **Correlation**: Messages are correlated with their originating traces
 
-### Usage Example
+### Trace Attribute Conventions
+
+#### Standard Message Attributes
+
+Use these attribute keys for message-related spans:
+
+- `messaging.system`: Always set to "nats"
+- `messaging.destination.name`: NATS subject name
+- `messaging.message.id`: Message ID (ULID)
+- `messaging.message.type`: Message type (request/response/event/control)
+- `messaging.message.from`: Source agent identifier
+- `messaging.message.to`: Target agent identifier
+
+#### AgentFlow-Specific Attributes
+
+- `agentflow.workflow.id`: Workflow identifier from metadata
+- `agentflow.agent.id`: Agent identifier from metadata
+- `agentflow.message.envelope_hash`: Message integrity hash
+- `agentflow.message.cost.tokens`: Token cost for processing
+- `agentflow.message.cost.dollars`: Dollar cost for processing
+
+### Span Naming Conventions
+
+- **Publish Operations**: `messaging.publish <subject>`
+- **Consume Operations**: `messaging.consume <subject>`
+- **Replay Operations**: `messaging.replay <workflow_id>`
+
+### Usage Examples
+
+#### Creating Spans with Attributes
 
 ```go
+// Start a publish span
+ctx, span := tracing.StartPublishSpan(ctx, "agents.classifier.in", message)
+defer span.End()
+
+// Add custom attributes
 span.SetAttributes(
-    attribute.String("agentflow.message.id", msg.ID),
-    attribute.String("agentflow.message.type", string(msg.Type)),
-    attribute.String("agentflow.message.from", msg.From),
-    attribute.String("agentflow.message.to", msg.To),
+    attribute.String("agentflow.workflow.id", workflowID),
+    attribute.String("agentflow.agent.id", agentID),
+    attribute.Int("agentflow.message.cost.tokens", 150),
+    attribute.Float64("agentflow.message.cost.dollars", 0.015),
 )
+
+// Record errors
+if err != nil {
+    span.RecordError(err)
+    span.SetStatus(codes.Error, err.Error())
+}
+```
+
+#### Trace Context Injection and Extraction
+
+```go
+// Publishing side - inject trace context
+tracing.InjectTraceContext(ctx, message)
+err := bus.Publish(ctx, subject, message)
+
+// Consuming side - extract trace context
+extractedCtx := tracing.ExtractTraceContext(message)
+consumeCtx, span := tracing.StartConsumeSpan(extractedCtx, subject, message)
+defer span.End()
+
+// Process message with trace context
+err := processMessage(consumeCtx, message)
+```
+
+### Tracing Configuration
+
+#### Environment Variables
+
+- `AF_TRACING_ENABLED`: Enable/disable tracing (default: `true`)
+- `AF_OTEL_EXPORTER_OTLP_ENDPOINT`: OTLP endpoint URL (default: `http://localhost:4318`)
+- `AF_SERVICE_NAME`: Service name for traces (default: `agentflow-messaging`)
+- `AF_TRACE_SAMPLE_RATE`: Sampling rate 0.0-1.0 (default: `1.0`)
+
+#### Configuration Example
+
+```go
+config := &TracingConfig{
+    Enabled:      true,
+    OTLPEndpoint: "http://jaeger:4318",
+    ServiceName:  "agentflow-worker",
+    SampleRate:   0.1, // Sample 10% of traces in production
+}
+
+tracing, err := NewTracingMiddleware(config)
+```
+
+### Trace Continuity Verification
+
+To verify trace continuity across message hops:
+
+1. **Root Span**: Create a root span for the workflow
+2. **Message Chain**: Each message should continue the same trace
+3. **Span Hierarchy**: Spans should form a proper parent-child relationship
+4. **Trace ID**: All spans in a workflow should share the same trace ID
+
+#### Example Trace Structure
+
+```
+customer-support-workflow (root)
+├── messaging.publish agents.classifier.in
+├── messaging.consume agents.classifier.in
+│   └── messaging.publish agents.knowledge-base.in
+├── messaging.consume agents.knowledge-base.in
+│   └── messaging.publish agents.response-generator.in
+├── messaging.consume agents.response-generator.in
+│   └── messaging.publish agents.customer-portal.out
+└── messaging.consume agents.customer-portal.out
+```
+
+### Jaeger UI Verification
+
+To verify traces in Jaeger:
+
+1. **Access UI**: Open http://localhost:16686
+2. **Select Service**: Choose your service name
+3. **Search Traces**: Use trace ID or time range
+4. **Verify Structure**: Check span hierarchy and timing
+5. **Check Attributes**: Verify all required attributes are present
+
+#### Expected Trace Attributes
+
+For each messaging span, verify these attributes exist:
+
+- `messaging.system` = "nats"
+- `messaging.destination.name` = subject name
+- `messaging.message.id` = message ULID
+- `messaging.message.type` = message type
+- `agentflow.workflow.id` = workflow identifier (if applicable)
+
+### Performance Considerations
+
+#### Sampling
+
+- **Development**: Use 100% sampling (`SampleRate: 1.0`)
+- **Production**: Use lower sampling rates (`SampleRate: 0.1` or less)
+- **High Volume**: Consider adaptive sampling based on error rates
+
+#### Span Attributes
+
+- **Essential Only**: Include only essential attributes to reduce overhead
+- **Batch Operations**: Use batch span processors for better performance
+- **Resource Limits**: Set appropriate memory and CPU limits for trace exporters
+
+### Troubleshooting Tracing
+
+#### Common Issues
+
+1. **Missing Traces**: Check OTLP endpoint configuration
+2. **Broken Continuity**: Verify trace context injection/extraction
+3. **High Overhead**: Reduce sampling rate or attribute count
+4. **Export Failures**: Check network connectivity to trace backend
+
+#### Debug Commands
+
+```bash
+# Test OTLP endpoint connectivity
+curl -X POST http://localhost:4318/v1/traces \
+  -H "Content-Type: application/json" \
+  -d '{"resourceSpans":[]}'
+
+# Enable trace debugging
+AF_OTEL_LOG_LEVEL=debug go run main.go
+
+# Verify trace export
+AF_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces \
+  go test -v -run TestTraceContinuity
 ```
 
 ## Logging Standards
