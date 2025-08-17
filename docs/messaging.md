@@ -399,6 +399,34 @@ For each messaging span, verify these attributes exist:
 - **Production**: Use lower sampling rates (`SampleRate: 0.1` or less)
 - **High Volume**: Consider adaptive sampling based on error rates
 
+## Structured Logging Baseline
+
+AgentFlow now provides a structured JSON logging baseline that ensures consistent, correlatable logs across messaging operations. Key points:
+
+- Implementation: `internal/logging/logger.go` (CorrelatedLogger with `NewLoggerWithWriter()`)
+- Correlation fields: `trace_id`, `span_id`, `message_id`, `workflow_id`, `agent_id` are automatically enriched from context and preserved across goroutines and message boundaries.
+- Field governance: Reserved fields are validated to prevent accidental overrides (`trace_id`, `span_id`, `message_id`, `workflow_id`, `agent_id`, `timestamp`, `level`, `message`).
+- Integration: Structured logging is integrated across messaging operations in `pkg/messaging/nats_bus.go` (publish, consume, replay).
+- Tests: Unit and integration tests live in `pkg/messaging/logging_integration_test.go` and context-preservation tests in `pkg/messaging/ping_pong_manual_test.go` (manual). All tests passing as of 2025-08-17.
+
+Quick verification
+
+1. Run the logging integration tests:
+
+  go test ./pkg/messaging -run TestStructuredLoggingIntegration
+
+2. Run the manual ping-pong test to observe logs during message exchanges:
+
+  go test ./pkg/messaging -run TestPingPongManual -v
+
+3. Tail logs produced by `af` or worker binaries and filter by `trace_id` to see correlated events.
+
+Notes
+
+- Logs are emitted as compact JSON objects to enable efficient ingestion by log aggregators.
+- The logger enforces deterministic field ordering to make envelope-level comparisons and reduce noise in diffs.
+- For production deployments, configure log output destination via `NewLoggerWithWriter()` or the consuming service's logging configuration.
+
 #### Span Attributes
 
 - **Essential Only**: Include only essential attributes to reduce overhead
@@ -545,3 +573,128 @@ go tool trace trace.out
 - [ ] Update documentation and examples
 - [ ] Run performance benchmarks
 - [ ] Verify trace continuity across versions
+
+## Structured Logging Standards
+
+AgentFlow uses structured JSON logging with automatic correlation field enrichment to enable efficient troubleshooting and distributed tracing across all messaging operations.
+
+### Log Format
+
+All log entries are output in JSON format with consistent field ordering:
+
+```json
+{
+  "timestamp": "2025-08-17T17:10:20.7927991Z",
+  "level": "info",
+  "message": "Starting ping-pong workflow",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
+  "message_id": "msg-123",
+  "workflow_id": "ping-pong-001",
+  "agent_id": "orchestrator",
+  "custom_field": "custom_value"
+}
+```
+
+### Reserved Field Names
+
+The following field names are reserved and cannot be overridden by application code:
+
+- `timestamp`: RFC3339 timestamp of the log entry
+- `level`: Log level (debug, info, warn, error)
+- `message`: Human-readable log message
+- `trace_id`: OpenTelemetry trace ID for distributed tracing
+- `span_id`: OpenTelemetry span ID for distributed tracing
+- `message_id`: AgentFlow message identifier for correlation
+- `workflow_id`: Workflow identifier for correlation
+- `agent_id`: Agent identifier for correlation
+
+### Correlation Fields
+
+AgentFlow automatically enriches log entries with correlation identifiers:
+
+#### Trace Context
+- `trace_id`: Extracted from OpenTelemetry trace context
+- `span_id`: Extracted from OpenTelemetry span context
+
+#### Message Context
+- `message_id`: Set when logging within message processing context
+- `workflow_id`: Set when logging within workflow context
+- `agent_id`: Set when logging within agent context
+
+### Log Levels
+
+- **debug**: Detailed information for debugging purposes
+- **info**: General information about system operation
+- **warn**: Warning conditions that don't prevent operation
+- **error**: Error conditions that may affect operation
+
+### Usage Examples
+
+#### Basic Logging
+```go
+logger := logging.NewLogger()
+logger.Info("Operation completed successfully")
+logger.Error("Failed to process request", err)
+```
+
+#### Context-Aware Logging
+```go
+// With trace context
+tracedLogger := logger.WithTrace(ctx)
+tracedLogger.Info("Processing message")
+
+// With message correlation
+messageLogger := logger.WithMessage("msg-123")
+messageLogger.Info("Message received")
+
+// With workflow context
+workflowLogger := logger.WithWorkflow("workflow-456").WithAgent("agent-789")
+workflowLogger.Info("Workflow step completed")
+```
+
+#### Chained Context
+```go
+correlatedLogger := logger.
+    WithTrace(ctx).
+    WithMessage(msg.ID).
+    WithWorkflow("workflow-123").
+    WithAgent("agent-456")
+
+correlatedLogger.Info("Processing message", 
+    logging.String("operation", "validate"),
+    logging.Int("attempt", 1),
+)
+```
+
+### Field Validation Rules
+
+1. **Reserved Fields**: Cannot use reserved field names in custom fields
+2. **Field Keys**: Must be non-empty and not contain only whitespace
+3. **Consistent Ordering**: Standard fields appear first, followed by custom fields in alphabetical order
+4. **JSON Compatibility**: All field values must be JSON-serializable
+
+### Integration with Messaging
+
+The logging system automatically integrates with the messaging layer:
+
+- Message publishing/consuming operations include trace context
+- Message IDs are automatically added to log correlation
+- Workflow and agent context is preserved across message boundaries
+- Error conditions include message details for debugging
+
+### Performance Considerations
+
+- Log entries are formatted with consistent field ordering for efficient parsing
+- Correlation fields are cached to avoid repeated context extraction
+- JSON marshaling uses optimized ordering to reduce serialization overhead
+- Reserved field validation occurs at logger creation time, not per log entry
+
+### Monitoring and Alerting
+
+Structured logs enable:
+- Correlation of events across distributed components using `trace_id`
+- Workflow-level debugging using `workflow_id` and `message_id`
+- Agent-specific troubleshooting using `agent_id`
+- Performance monitoring through timestamp analysis
+- Error rate tracking by log level and component

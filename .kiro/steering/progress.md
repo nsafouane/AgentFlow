@@ -15,6 +15,7 @@
   - Task 1 (Subject Taxonomy & Message Contract v1): ✅ COMPLETED (2025-08-17) - unit tests passing (10/10), coverage 71.9%
   - Task 2 (NATS JetStream Integration): ✅ COMPLETED (2025-08-17) - streams, durable consumers, replay, retry policies, unit tests
   - Task 3 (OpenTelemetry Context Propagation): ✅ COMPLETED (2025-08-17) - OTLP exporter, context injection/extraction, spans for publish/consume/replay, unit tests, manual Jaeger test, docs
+  - Task 4 (Structured Logging Baseline): ✅ COMPLETED (2025-08-17) - JSON structured logger, correlation enrichment, reserved field validation, integrated across messaging, unit/integration tests
 - [ ] **Q1.3 - Relational Storage & Migrations** - ⏳ **PLANNED**
 - [ ] **Q1.4 - Control Plane API Skeleton** - ⏳ **PLANNED**
 - [ ] **Q1.5 - Orchestrator & Deterministic Planners** - ⏳ **PLANNED**

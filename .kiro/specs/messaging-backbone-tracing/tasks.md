@@ -54,7 +54,17 @@ This implementation plan converts the messaging backbone design into a series of
   - Document trace attribute key conventions and usage patterns in /docs/messaging.md
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 4. Structured Logging Baseline
+- [x] 4. Structured Logging Baseline
+
+
+
+
+
+
+
+
+
+
   - Create structured logger wrapper that outputs JSON format with consistent field ordering
   - Implement automatic enrichment of log entries with trace_id, span_id, and message_id correlation fields
   - Add context-aware logging that preserves correlation IDs across goroutines and message processing

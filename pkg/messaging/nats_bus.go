@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/agentflow/agentflow/internal/logging"
 	"github.com/nats-io/nats.go"
 )
 
@@ -28,6 +28,7 @@ type natsBus struct {
 	config     *BusConfig
 	serializer *CanonicalSerializer
 	tracing    *TracingMiddleware
+	logger     logging.Logger
 }
 
 // NewNATSBus creates a new NATS JetStream message bus
@@ -74,6 +75,7 @@ func NewNATSBus(config *BusConfig) (MessageBus, error) {
 		config:     config,
 		serializer: serializer,
 		tracing:    tracing,
+		logger:     logging.NewLogger(),
 	}
 
 	// Initialize streams
@@ -93,11 +95,13 @@ func connectWithRetry(config *BusConfig) (*nats.Conn, error) {
 		nats.Timeout(config.ConnectTimeout),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
 			if err != nil {
-				messagingLogf("NATS disconnected: %v", err)
+				logger := logging.NewLogger()
+				logger.Error("NATS disconnected", err, logging.String("url", nc.ConnectedUrl()))
 			}
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			messagingLogf("NATS reconnected to %s", nc.ConnectedUrl())
+			logger := logging.NewLogger()
+			logger.Info("NATS reconnected", logging.String("url", nc.ConnectedUrl()))
 		}),
 	}
 
@@ -121,7 +125,11 @@ func connectWithRetry(config *BusConfig) (*nats.Conn, error) {
 				backoff += jitter
 			}
 
-			messagingLogf("NATS connection attempt %d failed, retrying in %v: %v", attempt+1, backoff, err)
+			logger := logging.NewLogger()
+			logger.Warn("NATS connection attempt failed, retrying",
+				logging.Int("attempt", attempt+1),
+				logging.String("backoff", backoff.String()),
+				logging.String("error", err.Error()))
 			time.Sleep(backoff)
 		}
 	}
@@ -196,13 +204,23 @@ func (nb *natsBus) Publish(ctx context.Context, subject string, msg *Message) er
 	ctx, span := nb.tracing.StartPublishSpan(ctx, subject, msg)
 	defer span.End()
 
+	// Create logger with trace and message context
+	logger := nb.logger.WithTrace(ctx).WithMessage(msg.ID)
+
 	// Inject trace context into message
 	nb.tracing.InjectTraceContext(ctx, msg)
+
+	logger.Debug("Publishing message",
+		logging.String("subject", subject),
+		logging.String("message_type", string(msg.Type)),
+		logging.String("from", msg.From),
+		logging.String("to", msg.To))
 
 	// Serialize the message
 	data, err := nb.serializer.Serialize(msg)
 	if err != nil {
 		span.RecordError(err)
+		logger.Error("Failed to serialize message", err)
 		return fmt.Errorf("failed to serialize message: %w", err)
 	}
 
@@ -210,8 +228,13 @@ func (nb *natsBus) Publish(ctx context.Context, subject string, msg *Message) er
 	_, err = nb.js.PublishAsync(subject, data)
 	if err != nil {
 		span.RecordError(err)
+		logger.Error("Failed to publish message", err, logging.String("subject", subject))
 		return fmt.Errorf("failed to publish message to subject %s: %w", subject, err)
 	}
+
+	logger.Info("Message published successfully",
+		logging.String("subject", subject),
+		logging.Int("payload_size", len(data)))
 
 	return nil
 }
@@ -268,9 +291,16 @@ func (nb *natsBus) Subscribe(ctx context.Context, subject string, handler Messag
 
 // processMessages handles incoming messages for a subscription
 func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, handler MessageHandler, subscription *Subscription) {
+	baseLogger := nb.logger.WithFields(
+		logging.String("subject", subscription.Subject),
+		logging.String("consumer", subscription.Consumer))
+
+	baseLogger.Info("Starting message processing")
+
 	for subscription.IsActive {
 		select {
 		case <-ctx.Done():
+			baseLogger.Info("Message processing stopped due to context cancellation")
 			return
 		default:
 			// Fetch messages with timeout
@@ -279,7 +309,7 @@ func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, 
 				if err == nats.ErrTimeout {
 					continue // Normal timeout, keep polling
 				}
-				messagingLogf("Error fetching messages: %v", err)
+				baseLogger.Error("Error fetching messages", err)
 				continue
 			}
 
@@ -287,14 +317,23 @@ func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, 
 				// Deserialize the message
 				var msg Message
 				if err := json.Unmarshal(natsMsg.Data, &msg); err != nil {
-					messagingLogf("Error deserializing message: %v", err)
+					baseLogger.Error("Error deserializing message", err,
+						logging.Int("data_size", len(natsMsg.Data)))
 					natsMsg.Nak()
 					continue
 				}
 
+				// Create message-specific logger
+				msgLogger := baseLogger.WithMessage(msg.ID).WithFields(
+					logging.String("message_type", string(msg.Type)),
+					logging.String("from", msg.From),
+					logging.String("to", msg.To))
+
+				msgLogger.Debug("Processing message")
+
 				// Verify message hash
 				if err := nb.serializer.ValidateHash(&msg); err != nil {
-					messagingLogf("Message hash validation failed: %v", err)
+					msgLogger.Error("Message hash validation failed", err)
 					natsMsg.Nak()
 					continue
 				}
@@ -303,16 +342,20 @@ func (nb *natsBus) processMessages(ctx context.Context, sub *nats.Subscription, 
 				traceCtx := nb.tracing.ExtractTraceContext(&msg)
 				traceCtx, span := nb.tracing.StartConsumeSpan(traceCtx, subscription.Subject, &msg)
 
+				// Create trace-aware logger
+				traceLogger := msgLogger.WithTrace(traceCtx)
+
 				// Handle the message
 				if err := handler(traceCtx, &msg); err != nil {
 					span.RecordError(err)
 					span.End()
-					messagingLogf("Message handler error: %v", err)
+					traceLogger.Error("Message handler error", err)
 					natsMsg.Nak()
 					continue
 				}
 
 				span.End()
+				traceLogger.Info("Message processed successfully")
 
 				// Acknowledge successful processing
 				natsMsg.Ack()
@@ -326,6 +369,13 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 	// Start replay span
 	ctx, span := nb.tracing.StartReplaySpan(ctx, workflowID)
 	defer span.End()
+
+	// Create logger with trace and workflow context
+	logger := nb.logger.WithTrace(ctx).WithWorkflow(workflowID)
+
+	logger.Info("Starting message replay",
+		logging.String("from_time", from.Format(time.RFC3339)))
+
 	// Build subject pattern for the workflow
 	subjectPattern := fmt.Sprintf("workflows.%s.*", workflowID)
 
@@ -344,18 +394,25 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 	_, err := nb.js.AddConsumer(StreamAFMessages, consumerConfig)
 	if err != nil {
 		span.RecordError(err)
+		logger.Error("Failed to create replay consumer", err,
+			logging.String("consumer_name", consumerName))
 		return nil, fmt.Errorf("failed to create replay consumer: %w", err)
 	}
 
 	// Clean up consumer when done
 	defer func() {
-		nb.js.DeleteConsumer(StreamAFMessages, consumerName)
+		if err := nb.js.DeleteConsumer(StreamAFMessages, consumerName); err != nil {
+			logger.Warn("Failed to cleanup replay consumer",
+				logging.String("consumer_name", consumerName),
+				logging.String("error", err.Error()))
+		}
 	}()
 
 	// Create subscription for replay
 	sub, err := nb.js.PullSubscribe(subjectPattern, consumerName)
 	if err != nil {
 		span.RecordError(err)
+		logger.Error("Failed to create replay subscription", err)
 		return nil, fmt.Errorf("failed to create replay subscription: %w", err)
 	}
 	defer sub.Unsubscribe()
@@ -370,6 +427,7 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 				break // No more messages
 			}
 			span.RecordError(err)
+			logger.Error("Failed to fetch replay messages", err)
 			return nil, fmt.Errorf("failed to fetch replay messages: %w", err)
 		}
 
@@ -377,16 +435,20 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 			break
 		}
 
+		logger.Debug("Fetched replay messages batch", logging.Int("count", len(msgs)))
+
 		for _, natsMsg := range msgs {
 			var msg Message
 			if err := json.Unmarshal(natsMsg.Data, &msg); err != nil {
-				messagingLogf("Error deserializing replay message: %v", err)
+				logger.Error("Error deserializing replay message", err,
+					logging.Int("data_size", len(natsMsg.Data)))
 				continue
 			}
 
 			// Verify message hash
 			if err := nb.serializer.ValidateHash(&msg); err != nil {
-				messagingLogf("Replay message hash validation failed: %v", err)
+				logger.Error("Replay message hash validation failed", err,
+					logging.String("message_id", msg.ID))
 				continue
 			}
 
@@ -399,6 +461,12 @@ func (nb *natsBus) Replay(ctx context.Context, workflowID string, from time.Time
 	sort.Slice(messages, func(i, j int) bool {
 		return messages[i].Timestamp.Before(messages[j].Timestamp)
 	})
+
+	logger.Info("Message replay completed",
+		logging.Int("message_count", len(messages)),
+		logging.String("time_range", fmt.Sprintf("%s to %s",
+			from.Format(time.RFC3339),
+			time.Now().Format(time.RFC3339))))
 
 	return messages, nil
 }
@@ -431,11 +499,4 @@ func applyEnvConfig(config *BusConfig) error {
 	// you would use a proper environment variable parsing library
 	// For now, we'll use the defaults
 	return nil
-}
-
-// messagingLogf prints logs for messaging only when AF_TEST_MESSAGING_NOISY is set
-func messagingLogf(format string, a ...interface{}) {
-	if os.Getenv("AF_TEST_MESSAGING_NOISY") == "1" {
-		fmt.Printf(format+"\n", a...)
-	}
 }

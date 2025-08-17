@@ -135,6 +135,8 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 
 - [x] Task 3: OpenTelemetry Context Propagation - ✅ COMPLETED 2025-08-17
 
+- [x] Task 4: Structured Logging Baseline - ✅ COMPLETED 2025-08-17
+
 ### Q1.2 Key Achievement (Task 3)
 
 - Implemented OpenTelemetry tracer with OTLP HTTP exporter and Jaeger-compatible configuration
@@ -143,6 +145,18 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 - Added unit tests verifying context propagation, span creation, and trace continuity across message hops; tests passing
 - Added manual test `TestManualTracingJaeger` with instructions to verify traces in Jaeger UI
 - Documentation updated in `/docs/messaging.md` with conventions, config, and troubleshooting
+
+### Q1.2 Key Achievement (Task 4)
+
+- Implemented Structured Logging Baseline (2025-08-17)
+
+	- Created a JSON-structured logger wrapper (`internal/logging/logger.go`) with deterministic field ordering and `NewLoggerWithWriter()` for flexible outputs.
+	- Automatic enrichment of correlation fields (`trace_id`, `span_id`, `message_id`, `workflow_id`, `agent_id`) via context-aware helpers (`WithTrace()`, `WithMessage()`, `WithWorkflow()`, `WithAgent()`).
+	- Reserved field validation and linting rules to prevent accidental overrides of critical keys.
+	- Integrated structured logging across messaging operations (publish, consume, replay) with preservation of correlation context across goroutines and message boundaries.
+	- Added unit and integration tests (`pkg/messaging/logging_integration_test.go`) and a manual ping-pong test (`pkg/messaging/ping_pong_manual_test.go`) verifying correlation propagation and field validation; tests pass locally.
+
+	Verification: Unit and integration tests pass; manual ping-pong logging verification documented in `/docs/messaging.md`.
 
 ### Q1.2 Key Achievements (Task 2)
 

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with security scanning
 - Database migration tooling with goose and sqlc
 - CLI validation tool (`af validate`)
+ - Structured Logging Baseline (2025-08-17): JSON-structured logger with deterministic field ordering; automatic correlation enrichment (`trace_id`, `span_id`, `message_id`, `workflow_id`, `agent_id`); reserved-field validation to prevent accidental overrides; integrated across messaging operations (publish/consume/replay). Includes unit and integration tests (`pkg/messaging/logging_integration_test.go`), a manual ping-pong verification (`pkg/messaging/ping_pong_manual_test.go`), and documentation updates in `/docs/messaging.md`.
 
 ### Changed
 
