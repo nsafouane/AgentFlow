@@ -1,6 +1,6 @@
 module github.com/agentflow/agentflow/sdk/go
 
-go 1.22
+go 1.23.0
 
 replace github.com/agentflow/agentflow => ../..
 

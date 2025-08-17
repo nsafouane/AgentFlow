@@ -162,6 +162,60 @@ When significant changes are needed:
 }
 ```
 
+## NATS JetStream Integration
+
+### Stream Configuration
+
+AgentFlow uses three NATS JetStream streams for message persistence:
+
+#### AF_MESSAGES Stream
+- **Subjects**: `workflows.*.*`, `agents.*.*`
+- **Storage**: File storage
+- **Retention**: 7 days (168 hours)
+- **Max Size**: 10GB
+- **Replicas**: 1 (configurable)
+
+#### AF_TOOLS Stream
+- **Subjects**: `tools.*`
+- **Storage**: File storage
+- **Retention**: 30 days (720 hours)
+- **Max Size**: 5GB
+- **Replicas**: 1 (configurable)
+
+#### AF_SYSTEM Stream
+- **Subjects**: `system.*`
+- **Storage**: File storage
+- **Retention**: 1 day (24 hours)
+- **Max Size**: 1GB
+- **Replicas**: 1 (configurable)
+
+### Consumer Configuration
+
+Durable consumers are created automatically with the following settings:
+
+- **Delivery Policy**: Deliver all messages
+- **Ack Policy**: Explicit acknowledgment required
+- **Replay Policy**: Instant replay
+- **Max In-Flight**: Configurable per consumer
+
+### Message Replay
+
+Messages can be replayed in chronological order:
+
+```go
+bus, _ := messaging.NewNATSBus(config)
+messages, err := bus.Replay(ctx, "workflow-123", time.Now().Add(-1*time.Hour))
+```
+
+### Connection Retry
+
+The NATS client implements exponential backoff with jitter:
+
+- **Base Delay**: 2 seconds
+- **Max Delay**: 30 seconds
+- **Jitter**: ±25% of calculated delay
+- **Max Attempts**: Configurable (default: 10)
+
 ## Environment Variables
 
 ### Message Bus Configuration
@@ -171,6 +225,8 @@ When significant changes are needed:
 - `AF_BUS_RECONNECT_WAIT`: Wait time between reconnections (default: `2s`)
 - `AF_BUS_ACK_WAIT`: Message acknowledgment timeout (default: `30s`)
 - `AF_BUS_MAX_IN_FLIGHT`: Maximum in-flight messages (default: `1000`)
+- `AF_BUS_CONNECT_TIMEOUT`: Connection timeout (default: `5s`)
+- `AF_BUS_REQUEST_TIMEOUT`: Request timeout (default: `10s`)
 
 ## Performance Guidelines
 

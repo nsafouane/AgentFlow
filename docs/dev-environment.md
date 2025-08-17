@@ -400,6 +400,28 @@ pre-commit autoupdate
 4. **Use Go module cache** to speed up builds
 5. **Configure IDE** for optimal Go development
 
+## Messaging test logging (quiet by default)
+
+The `pkg/messaging` package contains integration tests that intentionally exercise negative paths and emit diagnostic messages (for example, message hash validation failures). These logs can be very noisy during a full repo test run.
+
+To keep full test runs quiet by default, noisy messaging diagnostics are gated behind the environment variable `AF_TEST_MESSAGING_NOISY`. Set it to `1` when you want to see messaging internals during development or debugging.
+
+PowerShell example:
+
+```powershell
+$env:AF_TEST_MESSAGING_NOISY = '1'
+go test -v -count=1 github.com/agentflow/agentflow/pkg/messaging
+Remove-Item Env:AF_TEST_MESSAGING_NOISY
+```
+
+One-off (cmd wrapper) example:
+
+```powershell
+cmd /c "set AF_TEST_MESSAGING_NOISY=1&& go test -v -count=1 github.com/agentflow/agentflow/pkg/messaging"
+```
+
+If you want messaging integration tests to always run in CI with full diagnostics, configure your CI job to set `AF_TEST_MESSAGING_NOISY=1` for the messaging step.
+
 ## Environment Variables
 
 ### Required Variables (Devcontainer sets automatically)

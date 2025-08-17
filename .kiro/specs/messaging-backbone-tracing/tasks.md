@@ -23,7 +23,12 @@ This implementation plan converts the messaging backbone design into a series of
   - Document message contract schema and evolution rules in /docs/messaging.md
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 2. NATS JetStream Integration  
+- [x] 2. NATS JetStream Integration  
+
+
+
+
+
   - Implement NATS JetStream client with connection management and configurable URL via AF_BUS_URL environment variable
   - Create stream configurations for AF_MESSAGES, AF_TOOLS, AF_SYSTEM with appropriate retention and replica settings
   - Build publish/subscribe functionality with durable consumer setup and acknowledgment handling

@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -233,4 +234,197 @@ func PrettyPrintMessage(msg *Message) string {
 		return fmt.Sprintf("Error formatting message: %v", err)
 	}
 	return string(data)
+}
+
+// TestManualNATSLatency measures NATS server roundtrip latency
+// Run with: go test -v -run TestManualNATSLatency
+// Note: Requires a local NATS server running on localhost:4222 with JetStream enabled
+// Start with: nats-server -js
+func TestManualNATSLatency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping manual latency test in short mode")
+	}
+
+	ManualTestNATSLatency()
+}
+
+// ManualTestNATSLatency measures NATS server roundtrip latency
+func ManualTestNATSLatency() {
+	fmt.Println("=== Manual Test: NATS Latency ===")
+
+	// Try to connect to local NATS server
+	config := &BusConfig{
+		URL:            "nats://localhost:4222",
+		MaxReconnect:   3,
+		ReconnectWait:  1 * time.Second,
+		AckWait:        10 * time.Second,
+		MaxInFlight:    100,
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 5 * time.Second,
+	}
+
+	fmt.Printf("Connecting to NATS server at %s...\n", config.URL)
+
+	bus, err := NewNATSBus(config)
+	if err != nil {
+		fmt.Printf("Could not connect to local NATS server: %v\n", err)
+		fmt.Println("Please start a local NATS server with: nats-server -js")
+		return
+	}
+	defer bus.Close()
+
+	fmt.Println("Connected successfully!")
+
+	// Test parameters
+	const (
+		numMessages = 100
+		subject     = "test.latency"
+	)
+
+	// Set up subscription first
+	receivedMessages := make(chan *Message, numMessages)
+	latencies := make([]time.Duration, 0, numMessages)
+
+	handler := func(ctx context.Context, msg *Message) error {
+		// Extract send time from metadata
+		if sendTimeStr, ok := msg.Metadata["send_time"].(string); ok {
+			if sendTime, err := time.Parse(time.RFC3339Nano, sendTimeStr); err == nil {
+				latency := time.Since(sendTime)
+				latencies = append(latencies, latency)
+			}
+		}
+		receivedMessages <- msg
+		return nil
+	}
+
+	ctx := context.Background()
+	sub, err := bus.Subscribe(ctx, subject, handler)
+	if err != nil {
+		fmt.Printf("Failed to subscribe: %v\n", err)
+		return
+	}
+	defer sub.Unsubscribe()
+
+	// Wait a moment for subscription to be ready
+	time.Sleep(100 * time.Millisecond)
+
+	fmt.Printf("Publishing %d messages to measure latency...\n", numMessages)
+
+	// Publish messages and measure latency
+	start := time.Now()
+	for i := 0; i < numMessages; i++ {
+		msg := NewMessage(fmt.Sprintf("latency-test-%d", i), "latency-tester", "latency-receiver", MessageTypeEvent)
+		msg.SetPayload(map[string]interface{}{
+			"sequence": i,
+			"data":     "latency test payload",
+		})
+
+		// Add send time to metadata for latency calculation
+		sendTime := time.Now()
+		msg.AddMetadata("send_time", sendTime.Format(time.RFC3339Nano))
+
+		err := bus.Publish(ctx, subject, msg)
+		if err != nil {
+			fmt.Printf("Failed to publish message %d: %v\n", i, err)
+			return
+		}
+	}
+
+	// Wait for all messages to be received
+	timeout := time.After(10 * time.Second)
+	receivedCount := 0
+
+	for receivedCount < numMessages {
+		select {
+		case <-receivedMessages:
+			receivedCount++
+		case <-timeout:
+			fmt.Printf("Only received %d out of %d messages\n", receivedCount, numMessages)
+			return
+		}
+	}
+
+	totalDuration := time.Since(start)
+
+	// Calculate statistics
+	if len(latencies) == 0 {
+		fmt.Println("No latency measurements collected")
+		return
+	}
+
+	// Sort latencies for percentile calculations
+	sortedLatencies := make([]time.Duration, len(latencies))
+	copy(sortedLatencies, latencies)
+
+	// Simple bubble sort for small dataset
+	for i := 0; i < len(sortedLatencies); i++ {
+		for j := i + 1; j < len(sortedLatencies); j++ {
+			if sortedLatencies[i] > sortedLatencies[j] {
+				sortedLatencies[i], sortedLatencies[j] = sortedLatencies[j], sortedLatencies[i]
+			}
+		}
+	}
+
+	// Calculate percentiles
+	p50Index := len(sortedLatencies) * 50 / 100
+	p95Index := len(sortedLatencies) * 95 / 100
+	p99Index := len(sortedLatencies) * 99 / 100
+
+	if p50Index >= len(sortedLatencies) {
+		p50Index = len(sortedLatencies) - 1
+	}
+	if p95Index >= len(sortedLatencies) {
+		p95Index = len(sortedLatencies) - 1
+	}
+	if p99Index >= len(sortedLatencies) {
+		p99Index = len(sortedLatencies) - 1
+	}
+
+	p50 := sortedLatencies[p50Index]
+	p95 := sortedLatencies[p95Index]
+	p99 := sortedLatencies[p99Index]
+	min := sortedLatencies[0]
+	max := sortedLatencies[len(sortedLatencies)-1]
+
+	// Calculate average
+	var total time.Duration
+	for _, latency := range latencies {
+		total += latency
+	}
+	avg := total / time.Duration(len(latencies))
+
+	// Print results
+	fmt.Println("\n=== Latency Results ===")
+	fmt.Printf("Messages: %d\n", numMessages)
+	fmt.Printf("Total time: %v\n", totalDuration)
+	fmt.Printf("Throughput: %.2f msg/sec\n", float64(numMessages)/totalDuration.Seconds())
+	fmt.Println()
+	fmt.Printf("Latency Statistics:\n")
+	fmt.Printf("  Min:     %v\n", min)
+	fmt.Printf("  Average: %v\n", avg)
+	fmt.Printf("  P50:     %v\n", p50)
+	fmt.Printf("  P95:     %v\n", p95)
+	fmt.Printf("  P99:     %v\n", p99)
+	fmt.Printf("  Max:     %v\n", max)
+
+	// Check if we meet the performance target (p95 < 15ms)
+	target := 15 * time.Millisecond
+	fmt.Printf("\nPerformance Target: P95 < %v\n", target)
+	if p95 < target {
+		fmt.Printf("✅ PASSED: P95 latency %v is below target %v\n", p95, target)
+	} else {
+		fmt.Printf("❌ FAILED: P95 latency %v exceeds target %v\n", p95, target)
+	}
+
+	// Additional analysis
+	fmt.Println("\n=== Analysis ===")
+	slowMessages := 0
+	for _, latency := range latencies {
+		if latency > target {
+			slowMessages++
+		}
+	}
+	fmt.Printf("Messages exceeding %v: %d (%.1f%%)\n", target, slowMessages, float64(slowMessages)*100/float64(len(latencies)))
+
+	fmt.Println("\n=== Manual NATS Latency Test Complete ===")
 }

@@ -1,6 +1,6 @@
 # AgentFlow Development Progress
 
-**Last Updated**: 2025-08-16  
+**Last Updated**: 2025-08-17  
 **Current Phase**: Q1 MVP Foundation
 
 ## Current Status
@@ -13,6 +13,7 @@
   - Foundation ready for Q1.2 development
 - [ ] **Q1.2 - Messaging Backbone & Tracing Skeleton** - 🔄 **NEXT**
   - Task 1 (Subject Taxonomy & Message Contract v1): ✅ COMPLETED (2025-08-17) - unit tests passing (10/10), coverage 71.9%
+  - Task 2 (NATS JetStream Integration): ✅ COMPLETED (2025-08-17) - streams, durable consumers, replay, retry policies, unit tests
 - [ ] **Q1.3 - Relational Storage & Migrations** - ⏳ **PLANNED**
 - [ ] **Q1.4 - Control Plane API Skeleton** - ⏳ **PLANNED**
 - [ ] **Q1.5 - Orchestrator & Deterministic Planners** - ⏳ **PLANNED**

@@ -122,14 +122,28 @@
 - [Governance Framework](./CONTRIBUTING.md) - Development processes
 
 ## Next Phase: Q1.2 - Messaging Backbone & Tracing Skeleton
-With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project is ready to proceed to Q1.2 implementation focusing on:
+With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project moved into Q1.2 implementation focusing on:
 - NATS JetStream message bus implementation
 - Distributed tracing skeleton with OpenTelemetry
 - Basic observability and metrics collection
 - Message routing and delivery guarantees
 
+## Q1.2 - Messaging Backbone & Tracing Skeleton — Progress
+
+- [x] Task 1: Subject Taxonomy & Message Contract v1 - ✅ COMPLETED 2025-08-17
+- [x] Task 2: NATS JetStream Integration - ✅ COMPLETED 2025-08-17
+
+### Q1.2 Key Achievements (Task 2)
+
+- Implemented NATS JetStream client with connection management and configurable AF_BUS_URL
+- Created stream configurations for `AF_MESSAGES`, `AF_TOOLS`, `AF_SYSTEM` with retention and replica settings
+- Publish/subscribe functionality with durable consumers, acknowledgements, and replay support
+- Retry policies with exponential backoff & jitter for connection resilience
+- Unit tests covering connection, streams, publish/subscribe, ordering, replay, and retry logic
+- Manual latency measurement test and documentation updates in `/docs/messaging.md`
+
 ---
 
 **Status**: Q1.1 COMPLETED ✅  
-**Last Updated**: 2025-08-16  
-**Next Milestone**: Q1.2 Messaging Backbone & Tracing Skeleton
+**Last Updated**: 2025-08-17  
+**Next Milestone**: Continue Q1.2 (OpenTelemetry + Logging + Performance harness)
