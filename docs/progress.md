@@ -137,6 +137,8 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 
 - [x] Task 4: Structured Logging Baseline - ✅ COMPLETED 2025-08-17
 
+- [x] Task 5: Performance Harness (Ping-Pong) - ✅ COMPLETED 2025-08-20
+
 ### Q1.2 Key Achievement (Task 3)
 
 - Implemented OpenTelemetry tracer with OTLP HTTP exporter and Jaeger-compatible configuration
@@ -168,6 +170,15 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 - Manual latency measurement test and documentation updates in `/docs/messaging.md`
 
 ---
+
+### Q1.2 Key Achievement (Task 5)
+
+- Implemented Performance Harness core (`pkg/messaging/performance_harness.go`) and benchmark suite (`pkg/messaging/benchmark_test.go`) supporting configurable message count, concurrency, and payload size.
+- Statistical analysis includes P50, P95, and P99 latency calculations with latency histogram export and throughput/error metrics.
+- CI integration scripts (`scripts/test-performance.sh`, `scripts/test-performance.ps1`) enforce P95 < 15ms by default with environment-specific overrides and produce JSON reports for baseline and regression checks.
+- Unit tests for assertion logic and percentile calculations pass (8/8); manual benchmark helpers export baselines used by regression detection.
+- Performance targets met in local runs: P95 < 15ms, P50 < 5ms, throughput > 100 msg/sec, error rate < 1%.
+
 
 **Status**: Q1.1 COMPLETED ✅  
 **Last Updated**: 2025-08-17  

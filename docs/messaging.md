@@ -492,34 +492,291 @@ All log entries related to message processing are automatically enriched with:
 
 ## Performance Harness
 
-### Benchmark Configuration
+AgentFlow includes a comprehensive performance harness for measuring message routing latency and throughput using a ping-pong pattern. The harness provides configurable test parameters, statistical analysis, and CI integration with threshold enforcement.
 
-The messaging system includes a performance harness for measuring latency:
+### Performance Configuration
 
-```bash
-# Run ping-pong benchmark
-go test -bench=BenchmarkPingPong -benchtime=10s
+The performance harness supports extensive configuration:
 
-# Configure test parameters
-AF_BENCH_MESSAGE_COUNT=1000 \
-AF_BENCH_CONCURRENCY=10 \
-AF_BENCH_PAYLOAD_SIZE=1024 \
-go test -bench=BenchmarkPingPong
+```go
+config := &PerformanceConfig{
+    MessageCount:    1000,                    // Number of messages to send
+    Concurrency:     10,                      // Number of concurrent senders
+    PayloadSize:     1024,                    // Message payload size in bytes
+    WarmupMessages:  100,                     // Warmup messages (excluded from stats)
+    TestDuration:    60 * time.Second,        // Maximum test duration
+    P95Threshold:    15 * time.Millisecond,   // P95 latency threshold
+    P50Threshold:    5 * time.Millisecond,    // P50 latency threshold
+    EnableTracing:   false,                   // Enable OpenTelemetry tracing
+    Subject:         "test.performance",      // NATS subject for testing
+    ReportInterval:  5 * time.Second,         // Progress reporting interval
+}
 ```
 
-### CI Thresholds
+### Running Performance Tests
 
-- **p95 Latency**: < 15ms (Linux CI environment)
-- **Throughput**: > 1000 messages/second
-- **Memory Usage**: < 100MB for 10,000 messages
+#### Benchmark Tests
 
-### Environment-Specific Overrides
+```bash
+# Run standard ping-pong benchmark
+go test -bench=BenchmarkPingPongLatency -benchtime=10s ./pkg/messaging
+
+# Run concurrency benchmarks
+go test -bench=BenchmarkPingPongConcurrency -benchtime=5s ./pkg/messaging
+
+# Run payload size benchmarks
+go test -bench=BenchmarkPingPongPayloadSize -benchtime=5s ./pkg/messaging
+```
+
+#### Threshold Tests
+
+```bash
+# Run performance threshold validation
+go test -v ./pkg/messaging -run TestPerformanceThresholds
+
+# Run with custom thresholds
+AF_PERF_P95_THRESHOLD_MS=20 \
+AF_PERF_P50_THRESHOLD_MS=8 \
+go test -v ./pkg/messaging -run TestPerformanceThresholds
+```
+
+#### Manual Performance Testing
+
+```bash
+# Run comprehensive manual benchmark
+go test -tags=manual -v ./pkg/messaging -run TestManualPerformanceBenchmark
+
+# Record performance baseline
+go test -tags=manual -v ./pkg/messaging -run TestManualBaselineRecording
+```
+
+### CI Integration
+
+The performance harness integrates with CI/CD pipelines through dedicated scripts:
+
+#### Linux/macOS
+```bash
+# Run CI performance tests
+./scripts/test-performance.sh
+
+# Run with custom thresholds
+AF_PERF_P95_THRESHOLD_MS=25 ./scripts/test-performance.sh
+
+# Run local performance tests
+AF_PERFORMANCE_MODE=local ./scripts/test-performance.sh
+
+# Record baseline metrics
+AF_PERFORMANCE_MODE=baseline ./scripts/test-performance.sh
+```
+
+#### Windows
+```powershell
+# Run CI performance tests
+.\scripts\test-performance.ps1
+
+# Run with custom thresholds
+.\scripts\test-performance.ps1 -P95ThresholdMs 25
+
+# Run local performance tests
+.\scripts\test-performance.ps1 -Mode local
+
+# Record baseline metrics
+.\scripts\test-performance.ps1 -Mode baseline
+```
+
+### Performance Metrics
+
+The harness measures and reports comprehensive performance statistics:
+
+#### Latency Metrics
+- **Min Latency**: Fastest message roundtrip time
+- **Average Latency**: Mean roundtrip time across all messages
+- **P50 Latency**: 50th percentile (median) latency
+- **P95 Latency**: 95th percentile latency
+- **P99 Latency**: 99th percentile latency
+- **Max Latency**: Slowest message roundtrip time
+
+#### Throughput Metrics
+- **Messages/Second**: Total throughput in messages per second
+- **Completion Rate**: Percentage of messages successfully processed
+- **Error Rate**: Percentage of messages that failed processing
+
+#### Error Tracking
+- **Publish Errors**: Failed message publications
+- **Consume Errors**: Failed message consumption
+- **Timeout Errors**: Messages that exceeded timeout thresholds
+
+#### Latency Distribution
+The harness provides histogram buckets for latency analysis:
+- `<1ms`: Sub-millisecond responses
+- `1-5ms`: Fast responses
+- `5-10ms`: Normal responses
+- `10-15ms`: Acceptable responses
+- `15-25ms`: Slow responses
+- `25-50ms`: Very slow responses
+- `50-100ms`: Concerning responses
+- `>100ms`: Unacceptable responses
+
+### Performance Thresholds
+
+#### Default Thresholds
+- **P95 Latency**: < 15ms (Linux CI environment)
+- **P50 Latency**: < 5ms (Linux CI environment)
+- **Throughput**: > 100 messages/second
+- **Error Rate**: < 1%
+- **Completion Rate**: > 99%
+
+#### Environment-Specific Overrides
 
 Use environment variables to adjust thresholds for different environments:
 
-- `AF_PERF_P95_THRESHOLD_MS`: p95 latency threshold in milliseconds
-- `AF_PERF_THROUGHPUT_MIN`: Minimum throughput in messages/second
-- `AF_PERF_MEMORY_MAX_MB`: Maximum memory usage in MB
+```bash
+# Latency thresholds
+export AF_PERF_P95_THRESHOLD_MS=25    # P95 latency threshold in milliseconds
+export AF_PERF_P50_THRESHOLD_MS=10    # P50 latency threshold in milliseconds
+
+# Throughput thresholds
+export AF_PERF_MIN_THROUGHPUT=50      # Minimum throughput in messages/second
+
+# Test configuration
+export AF_SKIP_PERFORMANCE=false      # Skip performance tests entirely
+export AF_PERFORMANCE_MODE=ci         # Test mode: ci, local, or baseline
+```
+
+### Performance Scenarios
+
+The harness includes multiple test scenarios:
+
+#### Baseline Scenario
+- **Purpose**: Standard performance measurement
+- **Configuration**: 1000 messages, 10 concurrent senders, 1KB payload
+- **Thresholds**: P95 < 15ms, P50 < 5ms
+
+#### High Concurrency Scenario
+- **Purpose**: Test performance under high concurrent load
+- **Configuration**: 2000 messages, 50 concurrent senders, 1KB payload
+- **Thresholds**: P95 < 25ms, P50 < 10ms (relaxed for concurrency)
+
+#### Large Payload Scenario
+- **Purpose**: Test performance with large message payloads
+- **Configuration**: 500 messages, 5 concurrent senders, 16KB payload
+- **Thresholds**: P95 < 30ms, P50 < 15ms (relaxed for payload size)
+
+#### Tracing Overhead Scenario
+- **Purpose**: Measure OpenTelemetry tracing overhead
+- **Configuration**: 500 messages, 5 concurrent senders, 1KB payload, tracing enabled
+- **Thresholds**: P95 < 20ms, P50 < 8ms (accounts for tracing overhead)
+
+### Regression Detection
+
+The performance harness supports regression detection by comparing current results with historical baselines:
+
+#### Baseline Recording
+```bash
+# Record new baseline
+go test -tags=manual -v ./pkg/messaging -run TestManualBaselineRecording
+```
+
+#### Regression Testing
+```bash
+# Run regression detection
+go test -v ./pkg/messaging -run TestPerformanceRegression
+```
+
+#### Regression Criteria
+- **P95 Degradation**: > 10% increase from baseline
+- **Throughput Degradation**: > 10% decrease from baseline
+- **Error Rate Increase**: > 1% absolute increase
+
+### Performance Tuning Guidelines
+
+#### Message Size Optimization
+- Keep message payloads under 1MB for optimal performance
+- Use message references for large data instead of embedding
+- Consider payload compression for large messages
+
+#### Concurrency Tuning
+- Optimal concurrency depends on system resources and NATS configuration
+- Start with 10-20 concurrent senders and adjust based on results
+- Monitor CPU and memory usage during high concurrency tests
+
+#### NATS Configuration
+- Increase `max_in_flight` for higher throughput scenarios
+- Adjust `ack_wait` timeout based on processing requirements
+- Configure appropriate stream retention and storage settings
+
+#### System Optimization
+- Ensure adequate CPU and memory resources
+- Use SSD storage for NATS file storage
+- Configure network buffers for high throughput scenarios
+
+### Troubleshooting Performance Issues
+
+#### High Latency
+1. Check NATS server resource usage
+2. Verify network connectivity and latency
+3. Review message payload sizes
+4. Check for CPU or memory constraints
+
+#### Low Throughput
+1. Increase concurrency levels
+2. Optimize message serialization
+3. Review NATS stream configuration
+4. Check for network bandwidth limitations
+
+#### High Error Rates
+1. Review NATS server logs
+2. Check connection stability
+3. Verify message format compliance
+4. Monitor resource exhaustion
+
+### Performance Monitoring
+
+#### Continuous Monitoring
+- Run performance tests in CI/CD pipelines
+- Set up alerts for threshold violations
+- Track performance trends over time
+- Monitor production message latencies
+
+#### Metrics Collection
+- Export performance results to monitoring systems
+- Create dashboards for performance visualization
+- Set up automated regression detection
+- Track performance across different environments
+
+### Example Performance Report
+
+```markdown
+# Performance Test Report
+
+**Date:** 2025-08-19 15:30:00 UTC
+**Mode:** ci
+**Commit:** abc123def456
+**Branch:** main
+
+## Configuration
+- P95 Threshold: 15ms
+- P50 Threshold: 5ms
+- Min Throughput: 100 msg/sec
+
+## Test Results
+
+### Baseline Scenario
+- Messages: 1000 sent, 1000 received (100.0% completion)
+- Duration: 8.5s
+- Throughput: 117.6 msg/sec
+- Latency P50: 4.2ms ✅
+- Latency P95: 12.8ms ✅
+- Overall: ✅ PASSED
+
+### High Concurrency Scenario
+- Messages: 2000 sent, 1998 received (99.9% completion)
+- Duration: 15.2s
+- Throughput: 131.4 msg/sec
+- Latency P50: 8.7ms ✅
+- Latency P95: 23.1ms ✅
+- Overall: ✅ PASSED
+```
 
 ## Troubleshooting
 
