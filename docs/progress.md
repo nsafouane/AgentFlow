@@ -56,6 +56,10 @@
 - ✅ Type-safe database access through sqlc code generation
 - ✅ Strict reversibility policy with comprehensive governance
 - ✅ Cross-platform migration testing with Windows path validation
+- ✅ Core schema implementation with 11 tables and multi-tenant isolation
+- ✅ Performance optimization with 20+ strategic indexes
+- ✅ Hash-chain audit support and RBAC foundation
+- ✅ Comprehensive schema documentation with ER diagrams
 
 ### CLI & Validation
 - ✅ Enhanced `af validate` CLI with comprehensive environment validation
@@ -90,7 +94,10 @@
 - ✅ Complete CLI quickstart guide with integration examples
 
 ## Development Metrics
-- **Tasks Completed**: 19/19 (100% of Q1.1 spec + exit criteria)
+- **Q1.1 Tasks Completed**: 19/19 (100% of foundations + exit criteria)
+- **Q1.2 Tasks Completed**: 5/5 (100% of messaging backbone)
+- **Q1.3 Tasks Completed**: 1/5 (20% of relational storage - core schema complete)
+- **Overall Q1 Progress**: 25/29 tasks (86% complete)
 - **Build Success Rate**: 100% (all platforms tested)
 - **Test Coverage**: 100% (all modules have comprehensive unit tests)
 - **Cross-Platform Compatibility**: 100% (Windows native + Linux cross-build)
@@ -139,6 +146,10 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 
 - [x] Task 5: Performance Harness (Ping-Pong) - ✅ COMPLETED 2025-08-20
 
+## Q1.3 - Relational Storage & Migrations — Progress
+
+- [x] Task 1: Core Schema Migrations (tenants, users, agents, workflows, plans, messages, tools, audits, budgets, rbac_roles, rbac_bindings) - ✅ COMPLETED 2025-08-24
+
 ### Q1.2 Key Achievement (Task 3)
 
 - Implemented OpenTelemetry tracer with OTLP HTTP exporter and Jaeger-compatible configuration
@@ -179,7 +190,19 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 - Unit tests for assertion logic and percentile calculations pass (8/8); manual benchmark helpers export baselines used by regression detection.
 - Performance targets met in local runs: P95 < 15ms, P50 < 5ms, throughput > 100 msg/sec, error rate < 1%.
 
+### Q1.3 Key Achievement (Task 1)
 
-**Status**: Q1.1 COMPLETED ✅  
-**Last Updated**: 2025-08-17  
-**Next Milestone**: Continue Q1.2 (OpenTelemetry + Logging + Performance harness)
+- Implemented Core Schema Migrations (2025-08-24)
+  - Created comprehensive migration (`migrations/20250824000000_core_schema.sql`) with all 11 core tables: tenants, users, agents, workflows, plans, messages, tools, audits, budgets, rbac_roles, rbac_bindings
+  - Multi-tenant isolation with tenant_id columns and CASCADE delete constraints for data integrity
+  - Performance optimization with 20+ strategic indexes including tenant isolation, query optimization, and JSONB GIN indexes
+  - SQLC integration with type-safe Go code generation using PostgreSQL engine and pgx/v5 driver
+  - Comprehensive unit tests for migration structure validation (8 test cases) and SQLC generated code compilation (4 test cases); all tests passing
+  - Manual test procedures documented (`docs/manual-test-procedures.md`) covering fresh migrate, seed data, rollback, re-migrate cycle with cross-platform validation
+  - Schema ER diagram documentation (`docs/schema-er-diagram.md`) with Mermaid visualization showing table relationships and multi-tenant isolation patterns
+  - Hash-chain audit support, message envelope integration ready for Q1.2, and RBAC foundation for access control
+
+
+**Status**: Q1.1 COMPLETED ✅, Q1.2 COMPLETED ✅, Q1.3 IN PROGRESS (Task 1/5 Complete)  
+**Last Updated**: 2025-08-24  
+**Next Milestone**: Continue Q1.3 (Remaining storage tasks: Connection Pool, Repository Pattern, Transaction Management, Integration Tests)

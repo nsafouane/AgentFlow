@@ -10,8 +10,125 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type MigrationBaseline struct {
+type Agent struct {
+	ID           pgtype.UUID `json:"id"`
+	TenantID     pgtype.UUID `json:"tenant_id"`
+	Name         string      `json:"name"`
+	Type         string      `json:"type"`
+	Role         pgtype.Text `json:"role"`
+	ConfigJson   []byte      `json:"config_json"`
+	PoliciesJson []byte      `json:"policies_json"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+type Audit struct {
+	ID           pgtype.UUID        `json:"id"`
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	ActorType    string             `json:"actor_type"`
+	ActorID      string             `json:"actor_id"`
+	Action       string             `json:"action"`
+	ResourceType string             `json:"resource_type"`
+	ResourceID   pgtype.Text        `json:"resource_id"`
+	Details      []byte             `json:"details"`
+	Ts           pgtype.Timestamptz `json:"ts"`
+	PrevHash     []byte             `json:"prev_hash"`
+	Hash         []byte             `json:"hash"`
+}
+
+type Budget struct {
+	ID           pgtype.UUID `json:"id"`
+	TenantID     pgtype.UUID `json:"tenant_id"`
+	Name         string      `json:"name"`
+	Type         string      `json:"type"`
+	ResourceID   pgtype.UUID `json:"resource_id"`
+	Limits       []byte      `json:"limits"`
+	CurrentUsage []byte      `json:"current_usage"`
+	Period       string      `json:"period"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+type Message struct {
+	ID           pgtype.UUID        `json:"id"`
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	TraceID      pgtype.Text        `json:"trace_id"`
+	SpanID       pgtype.Text        `json:"span_id"`
+	FromAgent    string             `json:"from_agent"`
+	ToAgent      string             `json:"to_agent"`
+	Type         string             `json:"type"`
+	Payload      []byte             `json:"payload"`
+	Metadata     []byte             `json:"metadata"`
+	Cost         []byte             `json:"cost"`
+	Ts           pgtype.Timestamptz `json:"ts"`
+	EnvelopeHash string             `json:"envelope_hash"`
+}
+
+type Plan struct {
 	ID          pgtype.UUID `json:"id"`
+	WorkflowID  pgtype.UUID `json:"workflow_id"`
+	State       []byte      `json:"state"`
+	Steps       []byte      `json:"steps"`
+	Assignments []byte      `json:"assignments"`
+	Cost        []byte      `json:"cost"`
 	CreatedAt   time.Time   `json:"created_at"`
-	Description string      `json:"description"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
+type RbacBinding struct {
+	ID        pgtype.UUID `json:"id"`
+	TenantID  pgtype.UUID `json:"tenant_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	RoleID    pgtype.UUID `json:"role_id"`
+	CreatedAt time.Time   `json:"created_at"`
+}
+
+type RbacRole struct {
+	ID          pgtype.UUID `json:"id"`
+	TenantID    pgtype.UUID `json:"tenant_id"`
+	Name        string      `json:"name"`
+	Permissions []byte      `json:"permissions"`
+	CreatedAt   time.Time   `json:"created_at"`
+}
+
+type Tenant struct {
+	ID        pgtype.UUID `json:"id"`
+	Name      string      `json:"name"`
+	Tier      string      `json:"tier"`
+	Settings  []byte      `json:"settings"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+type Tool struct {
+	ID          pgtype.UUID `json:"id"`
+	TenantID    pgtype.UUID `json:"tenant_id"`
+	Name        string      `json:"name"`
+	Schema      []byte      `json:"schema"`
+	Permissions []byte      `json:"permissions"`
+	CostModel   []byte      `json:"cost_model"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
+type User struct {
+	ID           pgtype.UUID `json:"id"`
+	TenantID     pgtype.UUID `json:"tenant_id"`
+	Email        string      `json:"email"`
+	Role         string      `json:"role"`
+	HashedSecret pgtype.Text `json:"hashed_secret"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+type Workflow struct {
+	ID                        pgtype.UUID `json:"id"`
+	TenantID                  pgtype.UUID `json:"tenant_id"`
+	Name                      string      `json:"name"`
+	Version                   string      `json:"version"`
+	ConfigYaml                string      `json:"config_yaml"`
+	PlannerType               string      `json:"planner_type"`
+	TemplateVersionConstraint pgtype.Text `json:"template_version_constraint"`
+	CreatedAt                 time.Time   `json:"created_at"`
+	UpdatedAt                 time.Time   `json:"updated_at"`
 }

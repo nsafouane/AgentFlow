@@ -11,9 +11,46 @@ import (
 )
 
 type Querier interface {
-	CreateMigrationBaseline(ctx context.Context, description string) (MigrationBaseline, error)
-	GetMigrationBaseline(ctx context.Context, id pgtype.UUID) (MigrationBaseline, error)
-	ListMigrationBaselines(ctx context.Context) ([]MigrationBaseline, error)
+	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
+	CreateAudit(ctx context.Context, arg CreateAuditParams) (Audit, error)
+	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
+	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) (Workflow, error)
+	DeleteAgent(ctx context.Context, arg DeleteAgentParams) error
+	DeleteMessage(ctx context.Context, arg DeleteMessageParams) error
+	DeleteTenant(ctx context.Context, id pgtype.UUID) error
+	DeleteUser(ctx context.Context, arg DeleteUserParams) error
+	DeleteWorkflow(ctx context.Context, arg DeleteWorkflowParams) error
+	GetAgent(ctx context.Context, arg GetAgentParams) (Agent, error)
+	GetAgentByName(ctx context.Context, arg GetAgentByNameParams) (Agent, error)
+	GetAudit(ctx context.Context, arg GetAuditParams) (Audit, error)
+	GetAuditChain(ctx context.Context, tenantID pgtype.UUID) ([]Audit, error)
+	GetLatestAudit(ctx context.Context, tenantID pgtype.UUID) (Audit, error)
+	GetMessage(ctx context.Context, arg GetMessageParams) (Message, error)
+	GetTenant(ctx context.Context, id pgtype.UUID) (Tenant, error)
+	GetTenantByName(ctx context.Context, name string) (Tenant, error)
+	GetUser(ctx context.Context, arg GetUserParams) (User, error)
+	GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (User, error)
+	GetWorkflow(ctx context.Context, arg GetWorkflowParams) (Workflow, error)
+	GetWorkflowByNameVersion(ctx context.Context, arg GetWorkflowByNameVersionParams) (Workflow, error)
+	ListAgentsByTenant(ctx context.Context, tenantID pgtype.UUID) ([]Agent, error)
+	ListAgentsByType(ctx context.Context, arg ListAgentsByTypeParams) ([]Agent, error)
+	ListAuditsByActor(ctx context.Context, arg ListAuditsByActorParams) ([]Audit, error)
+	ListAuditsByResource(ctx context.Context, arg ListAuditsByResourceParams) ([]Audit, error)
+	ListAuditsByTenant(ctx context.Context, arg ListAuditsByTenantParams) ([]Audit, error)
+	ListMessagesByAgent(ctx context.Context, arg ListMessagesByAgentParams) ([]Message, error)
+	ListMessagesByTenant(ctx context.Context, arg ListMessagesByTenantParams) ([]Message, error)
+	ListMessagesByTimeRange(ctx context.Context, arg ListMessagesByTimeRangeParams) ([]Message, error)
+	ListMessagesByTrace(ctx context.Context, arg ListMessagesByTraceParams) ([]Message, error)
+	ListTenants(ctx context.Context) ([]Tenant, error)
+	ListUsersByTenant(ctx context.Context, tenantID pgtype.UUID) ([]User, error)
+	ListWorkflowsByPlanner(ctx context.Context, arg ListWorkflowsByPlannerParams) ([]Workflow, error)
+	ListWorkflowsByTenant(ctx context.Context, tenantID pgtype.UUID) ([]Workflow, error)
+	UpdateAgent(ctx context.Context, arg UpdateAgentParams) (Agent, error)
+	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateWorkflow(ctx context.Context, arg UpdateWorkflowParams) (Workflow, error)
 }
 
 var _ Querier = (*Queries)(nil)

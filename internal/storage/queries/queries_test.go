@@ -23,36 +23,79 @@ func TestSQLCGeneration(t *testing.T) {
 		t.Error("Failed to create Queries instance")
 	}
 
-	// Test method signatures exist - these should compile
-	var _ func(context.Context, pgtype.UUID) (MigrationBaseline, error) = queries.GetMigrationBaseline
-	var _ func(context.Context) ([]MigrationBaseline, error) = queries.ListMigrationBaselines
-	var _ func(context.Context, string) (MigrationBaseline, error) = queries.CreateMigrationBaseline
+	// Test core table method signatures exist - these should compile
+	var _ func(context.Context, CreateTenantParams) (Tenant, error) = queries.CreateTenant
+	var _ func(context.Context, pgtype.UUID) (Tenant, error) = queries.GetTenant
+	var _ func(context.Context) ([]Tenant, error) = queries.ListTenants
+
+	var _ func(context.Context, CreateUserParams) (User, error) = queries.CreateUser
+	var _ func(context.Context, GetUserParams) (User, error) = queries.GetUser
+
+	var _ func(context.Context, CreateAgentParams) (Agent, error) = queries.CreateAgent
+	var _ func(context.Context, GetAgentParams) (Agent, error) = queries.GetAgent
+
+	var _ func(context.Context, CreateWorkflowParams) (Workflow, error) = queries.CreateWorkflow
+	var _ func(context.Context, GetWorkflowParams) (Workflow, error) = queries.GetWorkflow
+
+	var _ func(context.Context, CreateMessageParams) (Message, error) = queries.CreateMessage
+	var _ func(context.Context, GetMessageParams) (Message, error) = queries.GetMessage
+
+	var _ func(context.Context, CreateAuditParams) (Audit, error) = queries.CreateAudit
+	var _ func(context.Context, GetAuditParams) (Audit, error) = queries.GetAudit
 
 	t.Log("All expected sqlc-generated methods exist and compile correctly")
 }
 
-// TestMigrationBaselineStruct verifies the generated struct has expected fields
-func TestMigrationBaselineStruct(t *testing.T) {
-	// Test that MigrationBaseline struct has expected fields
+// TestCoreStructs verifies the generated structs have expected fields
+func TestCoreStructs(t *testing.T) {
+	// Test that core structs have expected fields
 	var uuid pgtype.UUID
 	uuid.Scan("550e8400-e29b-41d4-a716-446655440000")
 
-	baseline := MigrationBaseline{
-		ID:          uuid,
-		CreatedAt:   time.Now(),
-		Description: "test description",
+	// Test Tenant struct
+	tenant := Tenant{
+		ID:        uuid,
+		Name:      "test-tenant",
+		Tier:      "free",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
-	if !baseline.ID.Valid {
-		t.Error("MigrationBaseline.ID field not accessible")
+	if !tenant.ID.Valid {
+		t.Error("Tenant.ID field not accessible")
+	}
+	if tenant.Name == "" {
+		t.Error("Tenant.Name field not accessible")
 	}
 
-	if baseline.CreatedAt.IsZero() {
-		t.Error("MigrationBaseline.CreatedAt field not accessible")
+	// Test User struct
+	user := User{
+		ID:       uuid,
+		TenantID: uuid,
+		Email:    "test@example.com",
+		Role:     "viewer",
 	}
 
-	if baseline.Description == "" {
-		t.Error("MigrationBaseline.Description field not accessible")
+	if !user.ID.Valid {
+		t.Error("User.ID field not accessible")
+	}
+	if user.Email == "" {
+		t.Error("User.Email field not accessible")
+	}
+
+	// Test Agent struct
+	agent := Agent{
+		ID:       uuid,
+		TenantID: uuid,
+		Name:     "test-agent",
+		Type:     "worker",
+	}
+
+	if !agent.ID.Valid {
+		t.Error("Agent.ID field not accessible")
+	}
+	if agent.Name == "" {
+		t.Error("Agent.Name field not accessible")
 	}
 }
 

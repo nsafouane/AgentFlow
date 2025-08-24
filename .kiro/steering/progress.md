@@ -1,6 +1,6 @@
 # AgentFlow Development Progress
 
-**Last Updated**: 2025-08-17  
+**Last Updated**: 2025-08-24  
 **Current Phase**: Q1 MVP Foundation
 
 ## Current Status
@@ -11,13 +11,14 @@
 - [x] **Q1.1 - Foundations & Project Governance** - ✅ **COMPLETED** (2025-08-16)
   - All 15 tasks completed including Gate G0 validation
   - Foundation ready for Q1.2 development
-- [ ] **Q1.2 - Messaging Backbone & Tracing Skeleton** - 🔄 **NEXT**
+- [x] **Q1.2 - Messaging Backbone & Tracing Skeleton** - ✅ **COMPLETED** (2025-08-20)
   - Task 1 (Subject Taxonomy & Message Contract v1): ✅ COMPLETED (2025-08-17) - unit tests passing (10/10), coverage 71.9%
   - Task 2 (NATS JetStream Integration): ✅ COMPLETED (2025-08-17) - streams, durable consumers, replay, retry policies, unit tests
   - Task 3 (OpenTelemetry Context Propagation): ✅ COMPLETED (2025-08-17) - OTLP exporter, context injection/extraction, spans for publish/consume/replay, unit tests, manual Jaeger test, docs
   - Task 4 (Structured Logging Baseline): ✅ COMPLETED (2025-08-17) - JSON structured logger, correlation enrichment, reserved field validation, integrated across messaging, unit/integration tests
   - Task 5 (Performance Harness): ✅ COMPLETED (2025-08-20) - Ping-pong performance harness, configurable benchmarks, statistical analysis (P50/P95/P99), throughput and regression detection; unit tests passing (8/8), CI threshold verified
-- [ ] **Q1.3 - Relational Storage & Migrations** - ⏳ **PLANNED**
+- [ ] **Q1.3 - Relational Storage & Migrations** - 🔄 **IN PROGRESS**
+  - Task 1 (Core Schema Migrations): ✅ COMPLETED (2025-08-24) - 11 core tables, multi-tenant isolation, comprehensive indexes, sqlc integration, unit tests passing
 - [ ] **Q1.4 - Control Plane API Skeleton** - ⏳ **PLANNED**
 - [ ] **Q1.5 - Orchestrator & Deterministic Planners** - ⏳ **PLANNED**
 - [ ] **Q1.6 - Data Plane Worker Runtime** - ⏳ **PLANNED**
@@ -53,13 +54,24 @@
 - Core interfaces documented and frozen
 - Threat modeling session scheduled
 
+### Q1.2 Messaging Backbone & Tracing Skeleton ✅
+**Completed**: 2025-08-20  
+**Duration**: 4 days  
+**Key Achievements**:
+- NATS JetStream integration with streams, consumers, and replay
+- OpenTelemetry distributed tracing with context propagation
+- Structured JSON logging with correlation field enrichment
+- Performance harness with statistical analysis (P50/P95/P99)
+- Message routing and delivery guarantees established
+- Cross-platform messaging validation completed
+
 ## Current Blockers
 - None
 
 ## Next Actions
-1. **Immediate**: Continue Q1.2 work (observability, logging baseline)
-2. **This Week**: Finalize Q1.2 spec requirements and plan Structured Logging (Task 4)
-3. **Dependencies**: Q1.1 foundation complete (✅ done)
+1. **Immediate**: Continue Q1.3 work (connection pool, repository pattern, transaction management)
+2. **This Week**: Complete remaining Q1.3 storage tasks (Tasks 2-5)
+3. **Dependencies**: Q1.1 foundation complete (✅ done), Q1.2 messaging complete (✅ done)
 
 ## Progress Tracking Rules
 
@@ -89,8 +101,8 @@ Each spec must complete all four components per task:
 ## Metrics Dashboard
 
 ### Development Velocity
-- **Specs Completed**: 1/10 (Q1.1 ✅)
-- **Current Sprint**: Q1.2 preparation
+- **Specs Completed**: 2/10 (Q1.1 ✅, Q1.2 ✅)
+- **Current Sprint**: Q1.3 relational storage (Task 1/5 complete)
 - **Gate Status**: G0 ✅ PASSED
 
 ### Quality Metrics
@@ -107,5 +119,5 @@ Each spec must complete all four components per task:
 
 ---
 
-**Status**: Foundation complete, ready for Q1.2 development  
-**Next Milestone**: Q1.2 Messaging Backbone completion
+**Status**: Q1.1 ✅ Q1.2 ✅ Q1.3 IN PROGRESS (1/5 tasks complete)  
+**Next Milestone**: Q1.3 Relational Storage completion

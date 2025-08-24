@@ -3,6 +3,9 @@ package messaging
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -17,10 +20,77 @@ import (
 type TestNATSContainer struct {
 	container testcontainers.Container
 	URL       string
+	// local process fields
+	proc     *os.Process
+	dataDir  string
+	execPath string
 }
 
 // StartNATSContainer starts a NATS server container for testing
 func StartNATSContainer(ctx context.Context) (*TestNATSContainer, error) {
+	// Allow using a local NATS server for testing when AF_TEST_USE_LOCAL_NATS=true
+	if os.Getenv("AF_TEST_USE_LOCAL_NATS") == "true" {
+		// Try to locate nats-server.exe in ./nats-server or in PATH
+		exePath := os.Getenv("AF_NATS_SERVER_PATH")
+		if exePath == "" {
+			// look under project nats-server dir
+			candidates := []string{"./nats-server/nats-server.exe", "./nats-server/nats-server", "nats-server.exe", "nats-server"}
+			for _, c := range candidates {
+				if _, err := os.Stat(c); err == nil {
+					exePath = c
+					break
+				}
+			}
+		}
+		if exePath == "" {
+			// If no local binary, fall back to AF_BUS_URL if provided
+			url := os.Getenv("AF_BUS_URL")
+			if url == "" {
+				return nil, fmt.Errorf("AF_TEST_USE_LOCAL_NATS=true but no nats-server binary found and AF_BUS_URL not set")
+			}
+			return &TestNATSContainer{container: nil, URL: url}, nil
+		}
+
+		// pick a free port
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return nil, fmt.Errorf("failed to pick free port: %w", err)
+		}
+		addr := ln.Addr().String()
+		ln.Close()
+		// extract port
+		_, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse free port: %w", err)
+		}
+
+		dataDir, err := os.MkdirTemp("", "nats-test-")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp dir: %w", err)
+		}
+
+		cmd := exec.CommandContext(ctx, exePath, "-js", "-m", "8222", "-p", port, "-sd", dataDir)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			os.RemoveAll(dataDir)
+			return nil, fmt.Errorf("failed to start nats-server: %w", err)
+		}
+
+		// wait for server to accept connections
+		url := fmt.Sprintf("nats://127.0.0.1:%s", port)
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			nc, err := nats.Connect(url, nats.Timeout(500*time.Millisecond))
+			if err == nil {
+				nc.Close()
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		return &TestNATSContainer{container: nil, URL: url, proc: cmd.Process, dataDir: dataDir, execPath: exePath}, nil
+	}
 	req := testcontainers.ContainerRequest{
 		Image:        "nats:2.10-alpine",
 		ExposedPorts: []string{"4222/tcp"},
@@ -56,7 +126,21 @@ func StartNATSContainer(ctx context.Context) (*TestNATSContainer, error) {
 
 // Stop stops and removes the NATS container
 func (tnc *TestNATSContainer) Stop(ctx context.Context) error {
-	return tnc.container.Terminate(ctx)
+	if tnc == nil {
+		return nil
+	}
+	if tnc.container != nil {
+		return tnc.container.Terminate(ctx)
+	}
+	// stop local process if present
+	if tnc.proc != nil {
+		_ = tnc.proc.Kill()
+		tnc.proc.Release()
+	}
+	if tnc.dataDir != "" {
+		_ = os.RemoveAll(tnc.dataDir)
+	}
+	return nil
 }
 
 func TestNATSBus_NewNATSBus(t *testing.T) {
@@ -133,8 +217,8 @@ func TestNATSBus_PublishSubscribe(t *testing.T) {
 	err = natsBus.serializer.SetEnvelopeHash(msg)
 	require.NoError(t, err)
 
-	// Set up subscription
-	subject := "agents.agent-2.in"
+	// Set up subscription - use unique suffix added to last token (keep three tokens)
+	subject := fmt.Sprintf("agents.agent-2.in-%d", time.Now().UnixNano())
 	receivedMessages := make(chan *Message, 1)
 
 	handler := func(ctx context.Context, receivedMsg *Message) error {
@@ -193,7 +277,7 @@ func TestNATSBus_MessageOrdering(t *testing.T) {
 	defer bus.Close()
 
 	natsBus := bus.(*natsBus)
-	subject := "agents.test-agent.in"
+	subject := fmt.Sprintf("agents.test-agent.in-%d", time.Now().UnixNano())
 
 	// Publish multiple messages with different timestamps
 	messages := make([]*Message, 5)
@@ -279,7 +363,7 @@ func TestNATSBus_Replay(t *testing.T) {
 	defer bus.Close()
 
 	natsBus := bus.(*natsBus)
-	workflowID := "test-workflow"
+	workflowID := fmt.Sprintf("test-workflow-%d", time.Now().UnixNano())
 
 	// Publish messages to workflow subjects
 	baseTime := time.Now().UTC()
@@ -425,23 +509,21 @@ func TestNATSBus_MessageValidation(t *testing.T) {
 	require.NoError(t, err)
 	defer bus.Close()
 
-	natsBus := bus.(*natsBus)
-	subject := "agents.test-agent.in"
+	// Keep subject token count compatible with stream subjects (agents.*.*)
+	// use a hyphen before the unique suffix so the subject stays three tokens
+	subject := fmt.Sprintf("agents.test-agent.in-%d", time.Now().UnixNano())
 
-	// Create message with valid hash
+	// Create message
 	msg := NewMessage("test-id", "sender", "test-agent", MessageTypeRequest)
 	msg.SetPayload(map[string]interface{}{"test": "data"})
 
-	// Set envelope hash properly
-	err = natsBus.serializer.SetEnvelopeHash(msg)
-	require.NoError(t, err)
+	// Note: envelope hash will be computed automatically in Publish()
 
-	// Set up subscription that tracks validation results
-	validMessages := make(chan *Message, 1)
-	invalidMessages := make(chan bool, 1)
+	// Set up subscription to track messages
+	receivedMessages := make(chan *Message, 2)
 
 	handler := func(ctx context.Context, receivedMsg *Message) error {
-		validMessages <- receivedMsg
+		receivedMessages <- receivedMsg
 		return nil
 	}
 
@@ -449,34 +531,45 @@ func TestNATSBus_MessageValidation(t *testing.T) {
 	require.NoError(t, err)
 	defer sub.Unsubscribe()
 
-	// Publish valid message
+	// Publish message - envelope hash is computed during publish
 	err = bus.Publish(ctx, subject, msg)
 	require.NoError(t, err)
 
 	// Should receive valid message
 	select {
-	case receivedMsg := <-validMessages:
+	case receivedMsg := <-receivedMessages:
 		assert.Equal(t, msg.ID, receivedMsg.ID)
-		assert.Equal(t, msg.EnvelopeHash, receivedMsg.EnvelopeHash)
+		// The hash should be computed during publish and validated during consumption
+		assert.NotEmpty(t, receivedMsg.EnvelopeHash, "Envelope hash should not be empty")
+		
+		// Test envelope hash validation independently
+		natsBus := bus.(*natsBus)
+		err := natsBus.serializer.ValidateHash(receivedMsg)
+		assert.NoError(t, err, "Received message should have valid envelope hash")
+		
 	case <-time.After(3 * time.Second):
 		t.Fatal("Valid message not received")
 	}
 
 	// Now test with tampered message (invalid hash)
-	tamperedMsg := *msg
-	tamperedMsg.EnvelopeHash = "invalid-hash"
-
-	// Publish tampered message - this should be rejected by the consumer
-	// Note: The message will be published but rejected during consumption
-	err = bus.Publish(ctx, subject, &tamperedMsg)
+	tamperedMsg := NewMessage("test-id-2", "sender", "test-agent", MessageTypeRequest)
+	tamperedMsg.SetPayload(map[string]interface{}{"test": "data"})
+	tamperedMsg.EnvelopeHash = "invalid-hash" // Set invalid hash
+	
+	// Bypass Publish's envelope hash computation by direct serialization/publish
+	natsBus := bus.(*natsBus)
+	natsBus.tracing.InjectTraceContext(ctx, tamperedMsg) // inject trace like Publish() does
+	data, err := natsBus.serializer.Serialize(tamperedMsg)
+	require.NoError(t, err)
+	
+	// Direct publish with invalid hash
+	_, err = natsBus.js.PublishAsync(subject, data)
 	require.NoError(t, err)
 
-	// Should not receive the tampered message (it gets NAK'd)
+	// Should not receive the tampered message (it gets NAK'd during validation)
 	select {
-	case <-validMessages:
+	case <-receivedMessages:
 		t.Fatal("Should not have received tampered message")
-	case <-invalidMessages:
-		// Expected - message was rejected
 	case <-time.After(2 * time.Second):
 		// Expected - message was rejected and not delivered to handler
 	}

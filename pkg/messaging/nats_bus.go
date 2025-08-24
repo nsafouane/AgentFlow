@@ -210,6 +210,14 @@ func (nb *natsBus) Publish(ctx context.Context, subject string, msg *Message) er
 	// Inject trace context into message
 	nb.tracing.InjectTraceContext(ctx, msg)
 
+	// Compute envelope hash after all modifications are complete
+	err := nb.serializer.SetEnvelopeHash(msg)
+	if err != nil {
+		span.RecordError(err)
+		logger.Error("Failed to set envelope hash", err)
+		return fmt.Errorf("failed to set envelope hash: %w", err)
+	}
+
 	logger.Debug("Publishing message",
 		logging.String("subject", subject),
 		logging.String("message_type", string(msg.Type)),
@@ -258,8 +266,8 @@ func (nb *natsBus) Subscribe(ctx context.Context, subject string, handler Messag
 		AckPolicy:     nats.AckExplicitPolicy,
 		AckWait:       nb.config.AckWait,
 		MaxAckPending: nb.config.MaxInFlight,
-		FilterSubject: subject,
-		ReplayPolicy:  nats.ReplayInstantPolicy,
+		// Do not set FilterSubject here; PullSubscribe with subject will bind the consumer
+		ReplayPolicy: nats.ReplayInstantPolicy,
 	}
 
 	// Create the consumer

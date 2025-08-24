@@ -240,3 +240,22 @@ __debug_bin
 # Go workspace
 go.work
 go.work.sum
+
+# NATS server binaries and data directories
+nats-server/
+jetstream/
+nats-data/
+*.dat
+*.blk
+*.fss
+*.idx
+nats-server.pid
+nats-streaming-server.pid
+
+# Performance test results
+performance-results/
+performance_results_*.json
+performance_baseline_*.json
+benchmark_*.log
+threshold_test_*.log
+regression_test_*.log
