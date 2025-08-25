@@ -37,7 +37,15 @@ This implementation plan converts the relational storage and migrations design i
   - Document hash-chain rationale, algorithm details, and verification procedures
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3. Envelope Hash Persistence (messages table)
+- [x] 3. Envelope Hash Persistence (messages table)
+
+
+
+
+
+
+
+
   - Add envelope_hash VARCHAR(64) NOT NULL column to messages table
   - Implement insert trigger or application-layer validation to ensure envelope_hash presence
   - Create message integrity validation that recomputes hash and compares with stored value
