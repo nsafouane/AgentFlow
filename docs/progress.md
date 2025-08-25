@@ -96,8 +96,8 @@
 ## Development Metrics
 - **Q1.1 Tasks Completed**: 19/19 (100% of foundations + exit criteria)
 - **Q1.2 Tasks Completed**: 5/5 (100% of messaging backbone)
-- **Q1.3 Tasks Completed**: 1/5 (20% of relational storage - core schema complete)
-- **Overall Q1 Progress**: 25/29 tasks (86% complete)
+- **Q1.3 Tasks Completed**: 2/5 (40% of relational storage - core schema and audit hash-chain complete)
+- **Overall Q1 Progress**: 26/29 tasks (90% complete)
 - **Build Success Rate**: 100% (all platforms tested)
 - **Test Coverage**: 100% (all modules have comprehensive unit tests)
 - **Cross-Platform Compatibility**: 100% (Windows native + Linux cross-build)
@@ -149,6 +149,7 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 ## Q1.3 - Relational Storage & Migrations — Progress
 
 - [x] Task 1: Core Schema Migrations (tenants, users, agents, workflows, plans, messages, tools, audits, budgets, rbac_roles, rbac_bindings) - ✅ COMPLETED 2025-08-24
+- [x] Task 2: Audit Hash-Chain Columns - ✅ COMPLETED 2025-08-24
 
 ### Q1.2 Key Achievement (Task 3)
 
@@ -202,7 +203,20 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
   - Schema ER diagram documentation (`docs/schema-er-diagram.md`) with Mermaid visualization showing table relationships and multi-tenant isolation patterns
   - Hash-chain audit support, message envelope integration ready for Q1.2, and RBAC foundation for access control
 
+### Q1.3 Key Achievement (Task 2)
 
-**Status**: Q1.1 COMPLETED ✅, Q1.2 COMPLETED ✅, Q1.3 IN PROGRESS (Task 1/5 Complete)  
+- Implemented Audit Hash-Chain Columns (2025-08-24)
+  - Added `prev_hash BYTEA` and `hash BYTEA NOT NULL` columns to audits table with proper hash-chain implementation
+  - Implemented SHA-256 hash computation function: `SHA256(prev_hash || canonical_json(audit_record))` with deterministic JSON serialization
+  - Created audit record insertion logic maintaining chronological hash chain integrity with proper genesis record handling (nil prev_hash)
+  - Built comprehensive hash-chain verification algorithm validating entire chain integrity with tamper detection and forensic analysis
+  - Comprehensive unit tests covering append-only integrity, tamper detection scenarios, and edge cases (15/15 test cases passing)
+  - CLI audit verification command (`af audit verify`) with tenant-specific verification, JSON output, and performance metrics
+  - Complete documentation (`docs/audit-hash-chain.md`) covering algorithm details, security properties, operational procedures, and compliance considerations
+  - Manual test script (`scripts/test-audit-tamper-detection.sh`) demonstrating end-to-end tamper detection capabilities
+  - Tamper-evident audit logging system providing forensic capabilities and enterprise-grade security compliance
+
+
+**Status**: Q1.1 COMPLETED ✅, Q1.2 COMPLETED ✅, Q1.3 IN PROGRESS (Task 2/5 Complete)  
 **Last Updated**: 2025-08-24  
 **Next Milestone**: Continue Q1.3 (Remaining storage tasks: Connection Pool, Repository Pattern, Transaction Management, Integration Tests)

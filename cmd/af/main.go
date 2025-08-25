@@ -39,21 +39,33 @@ type ServiceInfo struct {
 	Connection string `json:"connection,omitempty"`
 }
 
-// Progress: IN PROGRESS - 2025-08-16
-// Implementation: ✓ CLI stub created and functional, validate command added
+// Progress: IN PROGRESS - 2025-08-24
+// Implementation: ✓ CLI stub created and functional, validate command added, audit verify command added
 // Unit Tests: ✓ Basic test coverage implemented
 // Manual Testing: ✓ Cross-platform build validation passed
 // Documentation: ✓ Architecture documentation updated
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "validate" {
-		validateEnvironment()
+	if len(os.Args) < 2 {
+		printUsage()
 		return
 	}
 
+	switch os.Args[1] {
+	case "validate":
+		validateEnvironment()
+	case "audit":
+		handleAuditCommand()
+	default:
+		printUsage()
+	}
+}
+
+func printUsage() {
 	fmt.Println("AgentFlow CLI")
 	fmt.Println("Usage:")
-	fmt.Println("  af validate    Validate development environment")
-	log.Println("CLI tool stub - ready for implementation")
+	fmt.Println("  af validate       Validate development environment")
+	fmt.Println("  af audit verify   Verify audit hash-chain integrity")
+	log.Println("CLI tool - ready for implementation")
 }
 
 func validateEnvironment() {

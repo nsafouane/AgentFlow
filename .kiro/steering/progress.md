@@ -19,6 +19,7 @@
   - Task 5 (Performance Harness): ✅ COMPLETED (2025-08-20) - Ping-pong performance harness, configurable benchmarks, statistical analysis (P50/P95/P99), throughput and regression detection; unit tests passing (8/8), CI threshold verified
 - [ ] **Q1.3 - Relational Storage & Migrations** - 🔄 **IN PROGRESS**
   - Task 1 (Core Schema Migrations): ✅ COMPLETED (2025-08-24) - 11 core tables, multi-tenant isolation, comprehensive indexes, sqlc integration, unit tests passing
+  - Task 2 (Audit Hash-Chain Columns): ✅ COMPLETED (2025-08-24) - SHA-256 hash chains, tamper detection, CLI verification, comprehensive tests (15/15 passing), enterprise security compliance
 - [ ] **Q1.4 - Control Plane API Skeleton** - ⏳ **PLANNED**
 - [ ] **Q1.5 - Orchestrator & Deterministic Planners** - ⏳ **PLANNED**
 - [ ] **Q1.6 - Data Plane Worker Runtime** - ⏳ **PLANNED**
@@ -65,12 +66,22 @@
 - Message routing and delivery guarantees established
 - Cross-platform messaging validation completed
 
+### Q1.3 Relational Storage & Migrations 🔄
+**In Progress**: Started 2025-08-24  
+**Current Status**: 2/5 tasks complete (40%)  
+**Key Achievements**:
+- **Task 1**: Core schema with 11 tables, multi-tenant isolation, 20+ indexes
+- **Task 2**: Tamper-evident audit hash-chains with SHA-256, CLI verification, forensic analysis
+- Enterprise-grade security compliance and audit capabilities
+- Comprehensive test coverage (100% passing)
+- Cross-platform validation and documentation
+
 ## Current Blockers
 - None
 
 ## Next Actions
 1. **Immediate**: Continue Q1.3 work (connection pool, repository pattern, transaction management)
-2. **This Week**: Complete remaining Q1.3 storage tasks (Tasks 2-5)
+2. **This Week**: Complete remaining Q1.3 storage tasks (Tasks 3-5)
 3. **Dependencies**: Q1.1 foundation complete (✅ done), Q1.2 messaging complete (✅ done)
 
 ## Progress Tracking Rules
@@ -102,7 +113,7 @@ Each spec must complete all four components per task:
 
 ### Development Velocity
 - **Specs Completed**: 2/10 (Q1.1 ✅, Q1.2 ✅)
-- **Current Sprint**: Q1.3 relational storage (Task 1/5 complete)
+- **Current Sprint**: Q1.3 relational storage (Task 2/5 complete)
 - **Gate Status**: G0 ✅ PASSED
 
 ### Quality Metrics
@@ -119,5 +130,5 @@ Each spec must complete all four components per task:
 
 ---
 
-**Status**: Q1.1 ✅ Q1.2 ✅ Q1.3 IN PROGRESS (1/5 tasks complete)  
+**Status**: Q1.1 ✅ Q1.2 ✅ Q1.3 IN PROGRESS (2/5 tasks complete)  
 **Next Milestone**: Q1.3 Relational Storage completion
