@@ -96,8 +96,8 @@
 ## Development Metrics
 - **Q1.1 Tasks Completed**: 19/19 (100% of foundations + exit criteria)
 - **Q1.2 Tasks Completed**: 5/5 (100% of messaging backbone)
-- **Q1.3 Tasks Completed**: 3/5 (60% of relational storage - core schema, audit hash-chain, and envelope hash persistence complete)
-- **Overall Q1 Progress**: 27/29 tasks (93% complete)
+- **Q1.3 Tasks Completed**: 4/5 (80% of relational storage - core schema, audit hash-chain, envelope hash persistence, and Redis & vector dev bootstrap complete)
+- **Overall Q1 Progress**: 28/29 tasks (97% complete)
 - **Build Success Rate**: 100% (all platforms tested)
 - **Test Coverage**: 100% (all modules have comprehensive unit tests)
 - **Cross-Platform Compatibility**: 100% (Windows native + Linux cross-build)
@@ -151,6 +151,7 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
 - [x] Task 1: Core Schema Migrations (tenants, users, agents, workflows, plans, messages, tools, audits, budgets, rbac_roles, rbac_bindings) - ✅ COMPLETED 2025-08-24
 - [x] Task 2: Audit Hash-Chain Columns - ✅ COMPLETED 2025-08-24
 - [x] Task 3: Envelope Hash Persistence (messages table) - ✅ COMPLETED 2025-08-25
+- [x] Task 4: Redis & Vector Dev Bootstrap - ✅ COMPLETED 2025-08-25
 
 ### Q1.2 Key Achievement (Task 3)
 
@@ -230,7 +231,20 @@ With Q1.1 foundations complete and all Gate G0 criteria satisfied, the project m
   - Message service operations: `CreateMessage()`, `GetMessage()`, `ValidateMessageIntegrity()`, `ListMessagesByTrace()`, and `RecomputeEnvelopeHash()` with full envelope hash support
   - Tamper-evident message storage providing authenticity guarantees for replay operations and message integrity validation throughout the message lifecycle
 
+### Q1.3 Key Achievement (Task 4)
 
-**Status**: Q1.1 COMPLETED ✅, Q1.2 COMPLETED ✅, Q1.3 IN PROGRESS (Task 3/5 Complete)  
+- Implemented Redis & Vector Dev Bootstrap (2025-08-25)
+  - Created comprehensive docker-compose.yml with PostgreSQL, Redis, Qdrant vector database, and NATS services with proper health checks, volumes, and port mappings
+  - Implemented robust health check system (`internal/health/services.go`) with configurable timeouts, retry logic, and cross-platform support for Redis and Qdrant connectivity validation
+  - Extended `af validate` CLI command with Redis and Qdrant service status reporting, providing structured JSON output with connection details and availability status
+  - Added Windows-specific conditional test skipping with helpful guidance messages when services are unavailable ("Start with: docker-compose up redis/qdrant")
+  - Comprehensive unit test coverage (13/13 test cases passing) including mock servers, timeout handling, platform-specific behavior, and integration scenarios
+  - Created manual test infrastructure (`scripts/test-services-validation.ps1`) for end-to-end service validation, startup/shutdown workflows, and cross-platform testing
+  - Complete local services setup documentation (`docs/local-services-setup.md`) covering installation, configuration, troubleshooting, platform-specific instructions, and operational procedures
+  - Production-ready service configuration with Docker volumes for data persistence, proper networking, and health monitoring for all development services
+  - Cross-platform development environment support with proper fallback behavior and clear guidance for service management across Windows, Linux, and macOS
+
+
+**Status**: Q1.1 COMPLETED ✅, Q1.2 COMPLETED ✅, Q1.3 IN PROGRESS (Task 4/5 Complete)  
 **Last Updated**: 2025-08-25  
-**Next Milestone**: Continue Q1.3 (Remaining storage tasks: Connection Pool & Repository Pattern, Transaction Management & Integration Tests)
+**Next Milestone**: Complete Q1.3 (Remaining storage task: Connection Pool & Repository Pattern, Transaction Management & Integration Tests)

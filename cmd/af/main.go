@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/agentflow/agentflow/internal/health"
 )
 
 // ValidationResult represents the JSON output structure for af validate
@@ -95,6 +98,8 @@ func validateEnvironment() {
 	// Validate services
 	validatePostgreSQLService(&result)
 	validateNATSService(&result)
+	validateRedisService(&result)
+	validateQdrantService(&result)
 
 	// Add container warning if not in container
 	if result.Environment.Container == "host" {
@@ -499,6 +504,42 @@ func validateNATSService(result *ValidationResult) {
 		result.Services["nats"] = ServiceInfo{
 			Status:     "available",
 			Connection: "nats://localhost:4222",
+		}
+	}
+}
+
+func validateRedisService(result *ValidationResult) {
+	checker := health.NewServiceChecker(5 * time.Second)
+	ctx := context.Background()
+
+	status := checker.CheckRedis(ctx, "localhost:6379")
+	result.Services["redis"] = ServiceInfo{
+		Status:     status.Status,
+		Connection: status.Connection,
+	}
+
+	// Add guidance message for Windows users
+	if status.Status == "unavailable" && runtime.GOOS == "windows" {
+		if status.Message != "" {
+			result.Warnings = append(result.Warnings, status.Message)
+		}
+	}
+}
+
+func validateQdrantService(result *ValidationResult) {
+	checker := health.NewServiceChecker(5 * time.Second)
+	ctx := context.Background()
+
+	status := checker.CheckQdrant(ctx, "localhost:6333")
+	result.Services["qdrant"] = ServiceInfo{
+		Status:     status.Status,
+		Connection: status.Connection,
+	}
+
+	// Add guidance message for Windows users
+	if status.Status == "unavailable" && runtime.GOOS == "windows" {
+		if status.Message != "" {
+			result.Warnings = append(result.Warnings, status.Message)
 		}
 	}
 }

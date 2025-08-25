@@ -55,7 +55,12 @@ This implementation plan converts the relational storage and migrations design i
   - Document replay integrity procedures and envelope_hash integration with Q1.2 messaging
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 4. Redis & Vector Dev Bootstrap
+- [x] 4. Redis & Vector Dev Bootstrap
+
+
+
+
+
   - Create docker-compose.yml with PostgreSQL, Redis, and vector database (Qdrant) services
   - Implement health check endpoints for all services with appropriate timeouts and retry logic
   - Add service connectivity validation to `af validate` command with status reporting
