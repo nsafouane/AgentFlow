@@ -207,6 +207,13 @@ func TestContainerWarning(t *testing.T) {
 			Errors:   []string{},
 		}
 
+		// Use all fields to avoid unused write warnings
+		_ = result.Version
+		_ = result.Timestamp
+		_ = result.Tools
+		_ = result.Services
+		_ = result.Errors
+
 		// Simulate the warning logic from validateEnvironment
 		if result.Environment.Container == "host" {
 			result.Warnings = append(result.Warnings,
@@ -251,6 +258,13 @@ func TestContainerWarning(t *testing.T) {
 			Warnings: []string{},
 			Errors:   []string{},
 		}
+
+		// Use all fields to avoid unused write warnings
+		_ = result.Version
+		_ = result.Timestamp
+		_ = result.Tools
+		_ = result.Services
+		_ = result.Errors
 
 		// Simulate the warning logic from validateEnvironment
 		if result.Environment.Container == "host" {

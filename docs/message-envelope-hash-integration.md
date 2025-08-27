@@ -310,7 +310,8 @@ Integration tests verify end-to-end functionality:
 go test -v ./internal/storage/message/ -run TestService_
 
 # Run manual integration test (requires database)
-go run ./cmd/manual-test/
+# The manual test is available in the test file itself
+go test -v ./internal/storage/message/ -run ManualTestEnvelopeHashIntegration
 
 # Validate database schema
 goose -dir migrations postgres "connection_string" status

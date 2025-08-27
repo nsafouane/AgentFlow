@@ -24,31 +24,29 @@ type AuditVerifyResult struct {
 	ErrorMessage       string `json:"error_message,omitempty"`
 }
 
-func handleAuditCommand() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: af audit <subcommand>")
-		fmt.Println("Subcommands:")
-		fmt.Println("  verify [--tenant-id=<uuid>] [--json]    Verify audit hash-chain integrity")
-		return
+// auditCmd handles audit-related operations
+func auditCmd(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("audit command requires a subcommand: verify")
 	}
 
-	switch os.Args[2] {
+	subcommand := args[0]
+	subArgs := args[1:]
+
+	switch subcommand {
 	case "verify":
-		verifyAuditChain()
+		return verifyAuditChain(subArgs)
 	default:
-		fmt.Printf("Unknown audit subcommand: %s\n", os.Args[2])
-		fmt.Println("Available subcommands: verify")
-		os.Exit(1)
+		return fmt.Errorf("unknown audit subcommand: %s", subcommand)
 	}
 }
 
-func verifyAuditChain() {
+func verifyAuditChain(args []string) error {
 	// Parse command line arguments
 	var tenantID *pgtype.UUID
 	var jsonOutput bool
 
-	for i := 3; i < len(os.Args); i++ {
-		arg := os.Args[i]
+	for _, arg := range args {
 		if arg == "--json" {
 			jsonOutput = true
 		} else if len(arg) > 12 && arg[:12] == "--tenant-id=" {
@@ -57,8 +55,7 @@ func verifyAuditChain() {
 			var uuid pgtype.UUID
 			err := uuid.Scan(tenantIDStr)
 			if err != nil {
-				fmt.Printf("Invalid tenant ID format: %s\n", tenantIDStr)
-				os.Exit(1)
+				return fmt.Errorf("invalid tenant ID format: %s", tenantIDStr)
 			}
 			tenantID = &uuid
 		}
@@ -79,7 +76,7 @@ func verifyAuditChain() {
 			ErrorMessage: fmt.Sprintf("Failed to connect to database: %v", err),
 		}
 		outputResult(result, jsonOutput)
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer conn.Close(context.Background())
 
@@ -91,14 +88,14 @@ func verifyAuditChain() {
 
 	if tenantID != nil {
 		// Verify specific tenant
-		verifyTenant(auditService, *tenantID, jsonOutput, startTime)
+		return verifyTenant(auditService, *tenantID, jsonOutput, startTime)
 	} else {
 		// Verify all tenants
-		verifyAllTenants(auditService, conn, jsonOutput, startTime)
+		return verifyAllTenants(auditService, conn, jsonOutput, startTime)
 	}
 }
 
-func verifyTenant(auditService *audit.Service, tenantID pgtype.UUID, jsonOutput bool, startTime time.Time) {
+func verifyTenant(auditService *audit.Service, tenantID pgtype.UUID, jsonOutput bool, startTime time.Time) error {
 	result, err := auditService.VerifyChainIntegrity(context.Background(), tenantID)
 	if err != nil {
 		auditResult := AuditVerifyResult{
@@ -107,7 +104,7 @@ func verifyTenant(auditService *audit.Service, tenantID pgtype.UUID, jsonOutput 
 			ErrorMessage: fmt.Sprintf("Verification failed: %v", err),
 		}
 		outputResult(auditResult, jsonOutput)
-		os.Exit(1)
+		return fmt.Errorf("verification failed: %w", err)
 	}
 
 	duration := time.Since(startTime)
@@ -137,11 +134,13 @@ func verifyTenant(auditService *audit.Service, tenantID pgtype.UUID, jsonOutput 
 	outputResult(auditResult, jsonOutput)
 
 	if !result.Valid {
-		os.Exit(1)
+		return fmt.Errorf("audit hash-chain integrity compromised")
 	}
+
+	return nil
 }
 
-func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bool, startTime time.Time) {
+func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bool, startTime time.Time) error {
 	// Get all tenant IDs
 	rows, err := conn.Query(context.Background(), "SELECT id FROM tenants")
 	if err != nil {
@@ -151,7 +150,7 @@ func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bo
 			ErrorMessage: fmt.Sprintf("Failed to get tenants: %v", err),
 		}
 		outputResult(result, jsonOutput)
-		os.Exit(1)
+		return fmt.Errorf("failed to get tenants: %w", err)
 	}
 	defer rows.Close()
 
@@ -166,7 +165,7 @@ func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bo
 				ErrorMessage: fmt.Sprintf("Failed to scan tenant ID: %v", err),
 			}
 			outputResult(result, jsonOutput)
-			os.Exit(1)
+			return fmt.Errorf("failed to scan tenant ID: %w", err)
 		}
 		tenantIDs = append(tenantIDs, tenantID)
 	}
@@ -185,7 +184,7 @@ func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bo
 				ErrorMessage: fmt.Sprintf("Verification failed for tenant %s: %v", tenantID.Bytes, err),
 			}
 			outputResult(auditResult, jsonOutput)
-			os.Exit(1)
+			return fmt.Errorf("verification failed for tenant: %w", err)
 		}
 
 		totalRecords += result.TotalRecords
@@ -231,8 +230,10 @@ func verifyAllTenants(auditService *audit.Service, conn *pgx.Conn, jsonOutput bo
 	outputResult(auditResult, jsonOutput)
 
 	if firstError != nil {
-		os.Exit(1)
+		return fmt.Errorf("audit hash-chain integrity compromised")
 	}
+
+	return nil
 }
 
 func getStatus(result audit.VerificationResult) string {
@@ -287,11 +288,12 @@ func outputResult(result AuditVerifyResult, jsonOutput bool) {
 			fmt.Printf("Error: %s\n", result.ErrorMessage)
 		}
 
-		if result.Status == "success" {
+		switch result.Status {
+		case "success":
 			fmt.Println("✓ Hash-chain integrity verified successfully")
-		} else if result.Status == "tampered" {
+		case "tampered":
 			fmt.Println("✗ Hash-chain integrity compromised - tampering detected")
-		} else {
+		default:
 			fmt.Println("✗ Verification failed due to error")
 		}
 	}

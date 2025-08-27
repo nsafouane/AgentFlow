@@ -205,13 +205,133 @@ if ! af audit verify --json | jq -e '.status == "success"'; then
 fi
 ```
 
+### Forensics Verification Procedure
+
+When tampering is detected, follow this systematic forensics procedure:
+
+#### 1. Immediate Response
+```bash
+# Capture current state
+af audit verify --json > incident-$(date +%Y%m%d-%H%M%S).json
+
+# Isolate affected tenant
+TENANT_ID=$(jq -r '.tenant_id // "all"' incident-*.json)
+echo "Affected tenant: $TENANT_ID"
+
+# Stop all write operations to audit table
+# (Implementation depends on your access control system)
+```
+
+#### 2. Evidence Collection
+```bash
+# Get detailed information about tampered record
+TAMPERED_INDEX=$(jq -r '.first_tampered_index' incident-*.json)
+echo "First tampered record index: $TAMPERED_INDEX"
+
+# Extract tampered record details
+psql "$DATABASE_URL" -c "
+SELECT 
+    id,
+    tenant_id,
+    actor_type,
+    actor_id,
+    action,
+    resource_type,
+    resource_id,
+    details,
+    ts,
+    encode(prev_hash, 'hex') as prev_hash_hex,
+    encode(hash, 'hex') as hash_hex
+FROM audits 
+WHERE tenant_id = '$TENANT_ID'
+ORDER BY ts 
+OFFSET $TAMPERED_INDEX LIMIT 1;
+" > tampered-record-details.txt
+```
+
+#### 3. Chain Analysis
+```bash
+# Analyze chain break point
+psql "$DATABASE_URL" -c "
+WITH audit_chain AS (
+    SELECT 
+        ROW_NUMBER() OVER (ORDER BY ts) - 1 as index,
+        id,
+        actor_type,
+        actor_id,
+        action,
+        resource_type,
+        ts,
+        encode(prev_hash, 'hex') as prev_hash_hex,
+        encode(hash, 'hex') as hash_hex
+    FROM audits 
+    WHERE tenant_id = '$TENANT_ID'
+    ORDER BY ts
+)
+SELECT * FROM audit_chain 
+WHERE index BETWEEN $((TAMPERED_INDEX - 2)) AND $((TAMPERED_INDEX + 2));
+" > chain-context.txt
+```
+
+#### 4. Timeline Reconstruction
+```bash
+# Identify when tampering likely occurred
+psql "$DATABASE_URL" -c "
+SELECT 
+    'Last valid backup' as event,
+    MAX(ts) as timestamp
+FROM audit_backups 
+WHERE status = 'verified'
+UNION ALL
+SELECT 
+    'First tampered record' as event,
+    ts as timestamp
+FROM audits 
+WHERE tenant_id = '$TENANT_ID'
+ORDER BY ts 
+OFFSET $TAMPERED_INDEX LIMIT 1;
+" > tampering-timeline.txt
+```
+
+#### 5. Impact Assessment
+```bash
+# Count affected records
+TOTAL_RECORDS=$(jq -r '.total_records' incident-*.json)
+VERIFIED_RECORDS=$(jq -r '.verified_records' incident-*.json)
+AFFECTED_RECORDS=$((TOTAL_RECORDS - VERIFIED_RECORDS))
+
+echo "Impact Assessment:" > impact-assessment.txt
+echo "Total records: $TOTAL_RECORDS" >> impact-assessment.txt
+echo "Verified records: $VERIFIED_RECORDS" >> impact-assessment.txt
+echo "Potentially affected: $AFFECTED_RECORDS" >> impact-assessment.txt
+
+# Identify affected resources
+psql "$DATABASE_URL" -c "
+SELECT 
+    resource_type,
+    COUNT(*) as affected_count,
+    array_agg(DISTINCT resource_id) as affected_resources
+FROM audits 
+WHERE tenant_id = '$TENANT_ID'
+AND ts >= (
+    SELECT ts FROM audits 
+    WHERE tenant_id = '$TENANT_ID'
+    ORDER BY ts 
+    OFFSET $TAMPERED_INDEX LIMIT 1
+)
+GROUP BY resource_type;
+" >> impact-assessment.txt
+```
+
 ### Incident Response
 
 1. **Detection**: Automated verification detects tampering
 2. **Isolation**: Immediately isolate affected systems
-3. **Analysis**: Identify first tampered record and timeline
+3. **Analysis**: Follow forensics verification procedure above
 4. **Recovery**: Restore from known-good backup if necessary
-5. **Investigation**: Forensic analysis of tampered records
+5. **Investigation**: Complete forensic analysis of tampered records
+6. **Remediation**: Implement additional security controls
+7. **Documentation**: Create incident report with evidence
 
 ### Backup Integration
 
@@ -276,37 +396,257 @@ for offset := 0; offset < totalRecords; offset += batchSize {
 
 ### Common Issues
 
-**Verification Timeout:**
+#### Verification Timeout
+**Symptoms:** `af audit verify` hangs or times out on large audit chains
+
+**Solutions:**
 ```bash
 # Increase timeout for large chains
 export AUDIT_VERIFY_TIMEOUT=300s
 af audit verify
+
+# Process specific tenant only
+af audit verify --tenant-id=550e8400-e29b-41d4-a716-446655440000
+
+# Check database connection
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM audits;"
 ```
 
-**Memory Usage:**
+#### Memory Usage Issues
+**Symptoms:** High memory consumption during verification, OOM errors
+
+**Solutions:**
 ```bash
-# Process in smaller batches
+# Process in smaller batches (not yet implemented - future enhancement)
 af audit verify --batch-size=1000
+
+# Verify one tenant at a time
+for tenant in $(psql "$DATABASE_URL" -t -c "SELECT id FROM tenants;"); do
+    af audit verify --tenant-id="$tenant"
+done
 ```
 
-**Performance Issues:**
+#### Performance Issues
+**Symptoms:** Slow verification, throughput below 10k entries/sec
+
+**Diagnosis:**
 ```sql
 -- Check for missing indexes
 EXPLAIN ANALYZE SELECT * FROM audits WHERE tenant_id = $1 ORDER BY ts;
 
+-- Check table statistics
+SELECT 
+    schemaname,
+    tablename,
+    n_tup_ins,
+    n_tup_upd,
+    n_tup_del,
+    last_vacuum,
+    last_analyze
+FROM pg_stat_user_tables 
+WHERE tablename = 'audits';
+```
+
+**Solutions:**
+```sql
 -- Vacuum and analyze
 VACUUM ANALYZE audits;
+
+-- Rebuild indexes if needed
+REINDEX TABLE audits;
+
+-- Check for table bloat
+SELECT 
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) as table_size,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as index_size
+FROM pg_tables 
+WHERE tablename = 'audits';
+```
+
+#### Database Connection Errors
+**Symptoms:** "Failed to connect to database" errors
+
+**Diagnosis:**
+```bash
+# Test basic connectivity
+psql "$DATABASE_URL" -c "SELECT 1;"
+
+# Check if database exists
+psql "$(echo $DATABASE_URL | sed 's/\/[^\/]*$/\/postgres/')" -c "SELECT datname FROM pg_database WHERE datname = 'agentflow_dev';"
+
+# Verify credentials
+echo "Database URL: $DATABASE_URL"
+```
+
+**Solutions:**
+```bash
+# Set correct database URL
+export DATABASE_URL="postgres://agentflow:dev_password@localhost:5432/agentflow_dev?sslmode=disable"
+
+# Start PostgreSQL service
+# On Windows: net start postgresql-x64-15
+# On Linux: sudo systemctl start postgresql
+# On macOS: brew services start postgresql
+
+# Create database if missing
+createdb -h localhost -U agentflow agentflow_dev
+```
+
+#### Hash Mismatch Errors
+**Symptoms:** Verification fails with "hash mismatch at record X"
+
+**Diagnosis:**
+```bash
+# Get details of problematic record
+TENANT_ID="your-tenant-id"
+RECORD_INDEX=X  # Replace with actual index
+
+psql "$DATABASE_URL" -c "
+SELECT 
+    id,
+    actor_type,
+    actor_id,
+    action,
+    resource_type,
+    details,
+    ts,
+    encode(prev_hash, 'hex') as prev_hash_hex,
+    encode(hash, 'hex') as hash_hex
+FROM audits 
+WHERE tenant_id = '$TENANT_ID'
+ORDER BY ts 
+OFFSET $RECORD_INDEX LIMIT 1;
+"
+```
+
+**Possible Causes:**
+1. **Data Tampering**: Unauthorized modification of audit records
+2. **Corruption**: Hardware failure or software bug corrupted data
+3. **Migration Issues**: Problems during database migration or upgrade
+4. **Clock Skew**: System time changes affecting timestamp-based ordering
+
+**Investigation Steps:**
+```bash
+# Check for recent database changes
+psql "$DATABASE_URL" -c "
+SELECT 
+    schemaname,
+    tablename,
+    n_tup_upd,
+    n_tup_del,
+    last_vacuum,
+    last_analyze
+FROM pg_stat_user_tables 
+WHERE tablename = 'audits';
+"
+
+# Review database logs for suspicious activity
+# Location varies by system: /var/log/postgresql/, /opt/homebrew/var/log/
+
+# Check system integrity
+# Run filesystem check, memory test, etc.
+```
+
+#### Exit Code Issues
+**Symptoms:** Unexpected exit codes from `af audit verify`
+
+**Expected Exit Codes:**
+- `0`: Verification successful, no tampering detected
+- `1`: Tampering detected OR database/system error
+- `>1`: Unexpected error (should not occur)
+
+**Debugging:**
+```bash
+# Capture exit code
+af audit verify --tenant-id="$TENANT_ID"
+echo "Exit code: $?"
+
+# Get detailed error information
+af audit verify --tenant-id="$TENANT_ID" --json | jq '.error_message'
+
+# Check system logs
+journalctl -u agentflow --since "1 hour ago"  # Linux
+# or check Windows Event Viewer
 ```
 
 ### Debug Mode
 
 ```bash
-# Enable debug logging
+# Enable debug logging (future enhancement)
 export AUDIT_DEBUG=true
 af audit verify --tenant-id=uuid
 
-# Verify specific record
+# Verify specific record (future enhancement)
 af audit verify-record --id=record-uuid
+
+# Manual hash computation for debugging
+psql "$DATABASE_URL" -c "
+SELECT 
+    id,
+    tenant_id,
+    actor_type,
+    actor_id,
+    action,
+    resource_type,
+    resource_id,
+    details,
+    ts
+FROM audits 
+WHERE id = 'record-uuid';
+"
+```
+
+### Performance Benchmarking
+
+```bash
+# Measure verification performance
+time af audit verify --tenant-id="$TENANT_ID" --json
+
+# Expected performance targets:
+# - Throughput: ≥10,000 entries/second
+# - Latency: <100ms for chains up to 1,000 records
+# - Memory: <100MB for chains up to 100,000 records
+
+# If performance is below targets:
+# 1. Check database indexes
+# 2. Verify hardware resources (CPU, memory, disk I/O)
+# 3. Consider database tuning (shared_buffers, work_mem)
+# 4. Review network latency between application and database
+```
+
+### Recovery Procedures
+
+#### Restore from Backup
+```bash
+# If tampering is confirmed, restore from last known good backup
+pg_dump agentflow_prod > backup-before-restore.sql
+pg_restore --clean --if-exists backup-verified-YYYYMMDD.sql
+
+# Verify restored chain
+af audit verify --json | jq '.status == "success"'
+```
+
+#### Partial Chain Recovery
+```bash
+# If only recent records are affected, truncate to last valid record
+LAST_VALID_INDEX=X  # Determined from forensics analysis
+
+psql "$DATABASE_URL" -c "
+DELETE FROM audits 
+WHERE tenant_id = '$TENANT_ID'
+AND ts > (
+    SELECT ts FROM audits 
+    WHERE tenant_id = '$TENANT_ID'
+    ORDER BY ts 
+    OFFSET $LAST_VALID_INDEX LIMIT 1
+);
+"
+
+# Verify truncated chain
+af audit verify --tenant-id="$TENANT_ID"
 ```
 
 ## Future Enhancements

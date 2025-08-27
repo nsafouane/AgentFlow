@@ -53,22 +53,37 @@ func main() {
 		return
 	}
 
-	switch os.Args[1] {
+	command := os.Args[1]
+	args := os.Args[2:]
+
+	var err error
+	switch command {
 	case "validate":
 		validateEnvironment()
 	case "audit":
-		handleAuditCommand()
+		err = auditCmd(args)
+	case "backup":
+		err = backupCmd(args)
 	default:
 		printUsage()
+		return
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }
 
 func printUsage() {
 	fmt.Println("AgentFlow CLI")
 	fmt.Println("Usage:")
-	fmt.Println("  af validate       Validate development environment")
-	fmt.Println("  af audit verify   Verify audit hash-chain integrity")
-	log.Println("CLI tool - ready for implementation")
+	fmt.Println("  af validate                    Validate development environment")
+	fmt.Println("  af audit verify [tenant-id]    Verify audit hash-chain integrity")
+	fmt.Println("  af backup create [backup-dir]  Create database backup")
+	fmt.Println("  af backup restore <backup-id> [backup-dir] [restore-type]")
+	fmt.Println("  af backup verify <backup-id> [backup-dir] [--json]")
+	fmt.Println("  af backup list [backup-dir] [--json]")
 }
 
 func validateEnvironment() {

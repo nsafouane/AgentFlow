@@ -91,7 +91,16 @@ This implementation plan converts the relational storage and migrations design i
   - Document secrets usage patterns and future provider expansion plans
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 6. Audit Verification CLI Subcommand
+- [x] 6. Audit Verification CLI Subcommand
+
+
+
+
+
+
+
+
+
   - Implement `af audit verify` command that computes and validates entire hash-chain
   - Add throughput metrics reporting and performance optimization for ≥10k entries/sec target
   - Create tamper detection logic that reports first tampered entry index
@@ -101,7 +110,21 @@ This implementation plan converts the relational storage and migrations design i
   - Document forensics verification procedure and troubleshooting guide
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 7. Backup & Restore Baseline
+- [x] 7. Backup & Restore Baseline
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   - Create pg_dump scripts for schema and selective data tables with compression and parallel options
   - Implement backup artifact integrity hash generation and validation
   - Build restore smoke test automation for CI pipeline integration
