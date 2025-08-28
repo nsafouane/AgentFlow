@@ -1,16 +1,37 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"os"
+
+	"github.com/agentflow/agentflow/internal/logging"
+	"github.com/agentflow/agentflow/internal/server"
 )
 
-// Progress: COMPLETED - 2025-08-16
-// Implementation: ✓ Service stub created and functional
-// Unit Tests: ✓ Basic test coverage implemented
-// Manual Testing: ✓ Cross-platform build validation passed
-// Documentation: ✓ Architecture documentation updated
+// Progress: IN PROGRESS - Task 1: HTTP Server & Routing + Middleware Stack
+// Implementation: ✓ HTTP server with /api/v1 routing and middleware stack
+// Features: ✓ Recovery, logging, tracing, CORS middleware
+// Configuration: ✓ Configurable timeouts, TLS support, graceful shutdown
+// Integration: ✓ OpenTelemetry tracing from Q1.2, structured logging
 func main() {
-	fmt.Println("AgentFlow Control Plane starting...")
-	log.Println("Control Plane service stub - ready for implementation")
+	// Initialize structured logger
+	logger := logging.NewLogger()
+
+	// Load server configuration from environment
+	config := server.LoadFromEnv()
+
+	// Create and configure server
+	srv, err := server.New(config, logger)
+	if err != nil {
+		logger.Error("Failed to create server", err)
+		os.Exit(1)
+	}
+
+	// Start server with graceful shutdown
+	logger.Info("Starting AgentFlow Control Plane API server")
+	if err := srv.StartWithGracefulShutdown(); err != nil {
+		logger.Error("Server error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("AgentFlow Control Plane API server stopped")
 }
