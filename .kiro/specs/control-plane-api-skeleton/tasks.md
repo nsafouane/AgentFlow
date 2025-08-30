@@ -28,7 +28,13 @@ This implementation plan converts the control plane API design into a series of 
   - Document server configuration options, middleware chain behavior, and troubleshooting guide
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. AuthN (JWT Dev Secret) & Optional OIDC Flag
+- [x] 2. AuthN (JWT Dev Secret) & Optional OIDC Flag
+
+
+
+
+
+
   - Implement JWT token issuance and validation with configurable dev secret and claims extraction (tenant_id, user_id, roles)
   - Create authentication middleware with token extraction from Authorization header and context propagation
   - Build optional OIDC integration with feature flag (oidc.enabled) and graceful fallback to internal JWT
@@ -38,7 +44,12 @@ This implementation plan converts the control plane API design into a series of 
   - Document auth flows, token claims structure, OIDC configuration, and security considerations
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3. Multi-Tenancy Enforcement
+- [x] 3. Multi-Tenancy Enforcement
+
+
+
+
+
   - Implement tenant scoping for database queries with automatic tenant_id WHERE clause injection
   - Create message bus subject prefixes for tenant isolation using Q1.2 messaging integration
   - Build tenant context extraction from JWT claims with validation and cross-tenant access prevention

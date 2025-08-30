@@ -22,6 +22,7 @@ type MiddlewareStack struct {
 	logger            logging.Logger
 	tracer            trace.Tracer
 	tracingMiddleware interface{} // Will hold *messaging.TracingMiddleware
+	authMiddleware    interface{} // Will hold *security.AuthMiddleware
 }
 
 // NewMiddlewareStack creates a new middleware stack
@@ -36,6 +37,11 @@ func NewMiddlewareStack(logger logging.Logger) *MiddlewareStack {
 // SetTracingMiddleware sets the messaging tracing middleware
 func (ms *MiddlewareStack) SetTracingMiddleware(tracing interface{}) {
 	ms.tracingMiddleware = tracing
+}
+
+// SetAuthMiddleware sets the authentication middleware
+func (ms *MiddlewareStack) SetAuthMiddleware(auth interface{}) {
+	ms.authMiddleware = auth
 }
 
 // Use adds a middleware to the stack

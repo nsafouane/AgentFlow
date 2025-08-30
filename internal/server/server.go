@@ -11,18 +11,22 @@ import (
 	"time"
 
 	"github.com/agentflow/agentflow/internal/logging"
+	"github.com/agentflow/agentflow/internal/security"
 	"github.com/agentflow/agentflow/pkg/messaging"
 	"github.com/gorilla/mux"
 )
 
 // Server represents the HTTP server for AgentFlow Control Plane
 type Server struct {
-	config     *Config
-	logger     logging.Logger
-	httpServer *http.Server
-	router     *mux.Router
-	middleware *MiddlewareStack
-	tracing    *messaging.TracingMiddleware
+	config         *Config
+	logger         logging.Logger
+	httpServer     *http.Server
+	router         *mux.Router
+	middleware     *MiddlewareStack
+	tracing        *messaging.TracingMiddleware
+	authenticator  security.Authenticator
+	authMiddleware *security.AuthMiddleware
+	authHandlers   *security.AuthHandlers
 }
 
 // New creates a new HTTP server instance
@@ -47,9 +51,20 @@ func New(config *Config, logger logging.Logger) (*Server, error) {
 	// Create router
 	router := mux.NewRouter()
 
+	// Create authentication components
+	authConfig := security.LoadAuthConfigFromEnv()
+	authenticator, err := security.NewHybridAuthenticator(authConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator: %w", err)
+	}
+
+	authMiddleware := security.NewAuthMiddleware(authenticator, logger, authConfig)
+	authHandlers := security.NewAuthHandlers(authenticator, logger)
+
 	// Create middleware stack
 	middlewareStack := NewMiddlewareStack(logger)
 	middlewareStack.SetTracingMiddleware(tracing)
+	middlewareStack.SetAuthMiddleware(authMiddleware)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -61,12 +76,15 @@ func New(config *Config, logger logging.Logger) (*Server, error) {
 	}
 
 	server := &Server{
-		config:     config,
-		logger:     logger,
-		httpServer: httpServer,
-		router:     router,
-		middleware: middlewareStack,
-		tracing:    tracing,
+		config:         config,
+		logger:         logger,
+		httpServer:     httpServer,
+		router:         router,
+		middleware:     middlewareStack,
+		tracing:        tracing,
+		authenticator:  authenticator,
+		authMiddleware: authMiddleware,
+		authHandlers:   authHandlers,
 	}
 
 	// Setup middleware chain in correct order
@@ -95,7 +113,10 @@ func (s *Server) setupMiddleware() {
 	// 3. Tracing middleware (creates spans for requests)
 	s.middleware.Use(s.middleware.TracingMiddleware())
 
-	// 4. CORS middleware (handles cross-origin requests)
+	// 4. Authentication middleware (validates JWT tokens)
+	s.middleware.Use(s.authMiddleware.Middleware())
+
+	// 5. CORS middleware (handles cross-origin requests)
 	s.middleware.Use(s.middleware.CORSMiddleware())
 }
 
@@ -104,10 +125,16 @@ func (s *Server) setupRoutes() {
 	// API v1 routes
 	v1 := s.router.PathPrefix("/api/v1").Subrouter()
 
-	// Health check endpoint
+	// Health check endpoint (public)
 	v1.HandleFunc("/health", s.handleHealth).Methods("GET")
 
-	// Placeholder endpoints for future implementation
+	// Authentication endpoints (public)
+	v1.HandleFunc("/auth/token", s.authHandlers.HandleTokenIssue).Methods("POST")
+	v1.HandleFunc("/auth/validate", s.authHandlers.HandleTokenValidate).Methods("POST")
+	v1.HandleFunc("/auth/revoke", s.authHandlers.HandleTokenRevoke).Methods("POST")
+	v1.HandleFunc("/auth/userinfo", s.authHandlers.HandleUserInfo).Methods("GET")
+
+	// Protected endpoints for future implementation
 	v1.HandleFunc("/workflows", s.handleWorkflows).Methods("GET", "POST")
 	v1.HandleFunc("/workflows/{id}", s.handleWorkflow).Methods("GET", "PUT", "DELETE")
 	v1.HandleFunc("/agents", s.handleAgents).Methods("GET", "POST")
@@ -115,7 +142,7 @@ func (s *Server) setupRoutes() {
 	v1.HandleFunc("/tools", s.handleTools).Methods("GET", "POST")
 	v1.HandleFunc("/tools/{id}", s.handleTool).Methods("GET", "PUT", "DELETE")
 
-	// Root handler for API discovery
+	// Root handler for API discovery (public)
 	s.router.HandleFunc("/", s.handleRoot).Methods("GET")
 	s.router.HandleFunc("/api", s.handleAPIRoot).Methods("GET")
 }
@@ -220,6 +247,13 @@ func (s *Server) handleAPIRoot(w http.ResponseWriter, r *http.Request) {
 			"agents":    "/api/v1/agents",
 			"tools":     "/api/v1/tools",
 			"health":    "/api/v1/health",
+			"auth":      "/api/v1/auth",
+		},
+		"auth_endpoints": map[string]string{
+			"token":    "/api/v1/auth/token",
+			"validate": "/api/v1/auth/validate",
+			"revoke":   "/api/v1/auth/revoke",
+			"userinfo": "/api/v1/auth/userinfo",
 		},
 	}
 	s.writeJSONResponse(w, http.StatusOK, response)
